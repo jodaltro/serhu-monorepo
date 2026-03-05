@@ -4,6 +4,11 @@
 // ultra-fast communication between AWS Lambda (Vigília) and Fargate (Sono)
 // modules via gRPC/Protobuf.
 //
+// Uses Event Sourcing to record the Being's life as an immutable
+// sequence of PersonalityEvents.  The current state is derived by
+// replaying the event log, enabling full auditability and time-travel
+// debugging of the Being's evolution.
+//
 // Maps directly to the Pydantic models in:
 //   packages/orchestrator/src/serhu_orchestrator/personality/types.py
 //
@@ -12,10 +17,13 @@
 //   - TCI-R (Cloninger): https://en.wikipedia.org/wiki/Temperament_and_Character_Inventory
 //   - Schwartz refined values: https://pmc.ncbi.nlm.nih.gov/articles/PMC9131418/
 //   - Piaget stages: https://www.simplypsychology.org/piaget.html
+//   - Event Sourcing: https://martinfowler.com/eaaDev/EventSourcing.html
 
 syntax = "proto3";
 
 package serhu.identity;
+
+import "google/protobuf/timestamp.proto";
 
 option java_package = "com.serhu.identity";
 option java_multiple_files = true;
@@ -116,4 +124,161 @@ message PersonalityLedger {
 
   // Surface-level beliefs directly derived from user interactions.
   repeated string surface_beliefs = 12;
+}
+
+// ---------------------------------------------------------------------------
+// Event Sourcing – immutable life record
+// ---------------------------------------------------------------------------
+
+// Enumerates all event types in the Being's life log.
+// Each event represents a discrete, immutable change applied to the ledger.
+enum EventType {
+  EVENT_TYPE_UNSPECIFIED = 0;
+
+  // A new Being was created (tabula rasa).
+  BEING_CREATED = 1;
+
+  // Personality traits were updated during a wakefulness interaction.
+  TRAIT_UPDATE = 2;
+
+  // A developmental milestone was achieved.
+  MILESTONE_ACHIEVED = 3;
+
+  // The Being transitioned to a new Piaget stage.
+  STAGE_TRANSITION = 4;
+
+  // A new belief was added (core or surface).
+  BELIEF_ADDED = 5;
+
+  // A full sleep cycle was completed (NREM + REM).
+  SLEEP_CYCLE_COMPLETED = 6;
+
+  // An interaction was processed (user or being message).
+  INTERACTION_PROCESSED = 7;
+}
+
+// A single immutable event in the Being's life log.
+// Events are append-only and form the authoritative history from which
+// the current PersonalityLedger can be reconstructed via replay.
+message PersonalityEvent {
+  // Unique event identifier.
+  string event_id = 1;
+
+  // Identifier of the Being this event belongs to.
+  string ser_id = 2;
+
+  // Type of event.
+  EventType event_type = 3;
+
+  // When the event occurred.
+  google.protobuf.Timestamp timestamp = 4;
+
+  // Monotonically increasing sequence number per Being.
+  uint64 sequence_number = 5;
+
+  // Event-type-specific payload (exactly one should be set).
+  oneof payload {
+    TraitUpdatePayload trait_update = 10;
+    MilestonePayload milestone = 11;
+    StageTransitionPayload stage_transition = 12;
+    BeliefPayload belief = 13;
+    SleepCyclePayload sleep_cycle = 14;
+    InteractionPayload interaction = 15;
+    BeingCreatedPayload being_created = 16;
+  }
+}
+
+// Payload: trait deltas applied during an interaction.
+message TraitUpdatePayload {
+  // Map of model name (e.g. "hexaco") → facet deltas.
+  map<string, FacetDeltas> deltas = 1;
+}
+
+// A set of facet-name → delta pairs for a single personality model.
+message FacetDeltas {
+  map<string, float> values = 1;
+}
+
+// Payload: a developmental milestone was achieved.
+message MilestonePayload {
+  string milestone_id = 1;
+  float new_cognitive_age = 2;
+}
+
+// Payload: the Being transitioned to a new Piaget stage.
+message StageTransitionPayload {
+  string from_stage = 1;
+  string to_stage = 2;
+  string new_erikson_conflict = 3;
+}
+
+// Payload: a belief was added.
+message BeliefPayload {
+  // "core" or "surface"
+  string belief_type = 1;
+  string content = 2;
+}
+
+// Payload: sleep cycle was completed.
+message SleepCyclePayload {
+  uint32 num_rollouts = 1;
+  uint32 svd_rank = 2;
+  uint32 facts_extracted = 3;
+  uint32 beliefs_added = 4;
+}
+
+// Payload: an interaction message was processed.
+message InteractionPayload {
+  string role = 1;   // user | being | system
+  string content = 2;
+}
+
+// Payload: a new Being was created.
+message BeingCreatedPayload {
+  string name = 1;
+  string language = 2;
+}
+
+// ---------------------------------------------------------------------------
+// gRPC Service – communication between Lambda (vigília) and Fargate (sono)
+// ---------------------------------------------------------------------------
+
+// Service for managing the lifecycle of a synthetic Being's personality
+// using the Personality Ledger.  Designed for high-performance binary
+// communication between the wakefulness (Lambda) and sleep (Fargate) modules.
+service BeingService {
+  // Retrieve the current personality ledger for a Being.
+  rpc GetLedger(GetLedgerRequest) returns (PersonalityLedger);
+
+  // Record a new event in the Being's life log.
+  rpc RecordEvent(PersonalityEvent) returns (RecordEventResponse);
+
+  // Replay the event log to reconstruct the ledger at a point in time.
+  rpc ReplayEvents(ReplayEventsRequest) returns (PersonalityLedger);
+
+  // Stream events for a Being (server-side streaming for real-time sync).
+  rpc StreamEvents(StreamEventsRequest) returns (stream PersonalityEvent);
+}
+
+message GetLedgerRequest {
+  string ser_id = 1;
+}
+
+message RecordEventResponse {
+  // Sequence number assigned to the event.
+  uint64 sequence_number = 1;
+  // Updated ledger snapshot after applying the event.
+  PersonalityLedger ledger = 2;
+}
+
+message ReplayEventsRequest {
+  string ser_id = 1;
+  // Optional: replay up to this sequence number (0 = all).
+  uint64 up_to_sequence = 2;
+}
+
+message StreamEventsRequest {
+  string ser_id = 1;
+  // Start streaming from this sequence number (0 = beginning).
+  uint64 from_sequence = 2;
 }

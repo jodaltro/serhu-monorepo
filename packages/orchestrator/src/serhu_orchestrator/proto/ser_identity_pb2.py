@@ -22,9 +22,10 @@ _runtime_version.ValidateProtobufRuntimeVersion(
 _sym_db = _symbol_database.Default()
 
 
+from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x12ser_identity.proto\x12\x0eserhu.identity\"\x1c\n\x0bHexacoFacet\x12\r\n\x05score\x18\x01 \x01(\x02\"\x1c\n\x0bTciSubscale\x12\r\n\x05score\x18\x01 \x01(\x02\"\x1e\n\rSchwartzValue\x12\r\n\x05score\x18\x01 \x01(\x02\"\x8a\x01\n\x10\x44\x65velopmentStage\x12\r\n\x05stage\x18\x01 \x01(\t\x12\x18\n\x10\x65rikson_conflict\x18\x02 \x01(\t\x12\x15\n\rcognitive_age\x18\x03 \x01(\x02\x12\x19\n\x11interaction_count\x18\x04 \x01(\r\x12\x1b\n\x13milestones_achieved\x18\x05 \x03(\t\"\xbb\x06\n\x11PersonalityLedger\x12\x0e\n\x06ser_id\x18\x01 \x01(\t\x12\x1a\n\x12\x63ognitive_age_days\x18\x02 \x01(\r\x12\x14\n\x0cpiaget_stage\x18\x03 \x01(\t\x12=\n\x06hexaco\x18\x04 \x03(\x0b\x32-.serhu.identity.PersonalityLedger.HexacoEntry\x12N\n\x0ftci_temperament\x18\x05 \x03(\x0b\x32\x35.serhu.identity.PersonalityLedger.TciTemperamentEntry\x12J\n\rtci_character\x18\x06 \x03(\x0b\x32\x33.serhu.identity.PersonalityLedger.TciCharacterEntry\x12\x41\n\x08schwartz\x18\x07 \x03(\x0b\x32/.serhu.identity.PersonalityLedger.SchwartzEntry\x12\x35\n\x0b\x64\x65velopment\x18\x08 \x01(\x0b\x32 .serhu.identity.DevelopmentStage\x12\x0c\n\x04name\x18\t \x01(\t\x12\x10\n\x08language\x18\n \x01(\t\x12\x14\n\x0c\x63ore_beliefs\x18\x0b \x03(\t\x12\x17\n\x0fsurface_beliefs\x18\x0c \x03(\t\x1aJ\n\x0bHexacoEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12*\n\x05value\x18\x02 \x01(\x0b\x32\x1b.serhu.identity.HexacoFacet:\x02\x38\x01\x1aR\n\x13TciTemperamentEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12*\n\x05value\x18\x02 \x01(\x0b\x32\x1b.serhu.identity.TciSubscale:\x02\x38\x01\x1aP\n\x11TciCharacterEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12*\n\x05value\x18\x02 \x01(\x0b\x32\x1b.serhu.identity.TciSubscale:\x02\x38\x01\x1aN\n\rSchwartzEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12,\n\x05value\x18\x02 \x01(\x0b\x32\x1d.serhu.identity.SchwartzValue:\x02\x38\x01\x42\x16\n\x12\x63om.serhu.identityP\x01\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x12ser_identity.proto\x12\x0eserhu.identity\x1a\x1fgoogle/protobuf/timestamp.proto\"\x1c\n\x0bHexacoFacet\x12\r\n\x05score\x18\x01 \x01(\x02\"\x1c\n\x0bTciSubscale\x12\r\n\x05score\x18\x01 \x01(\x02\"\x1e\n\rSchwartzValue\x12\r\n\x05score\x18\x01 \x01(\x02\"\x8a\x01\n\x10\x44\x65velopmentStage\x12\r\n\x05stage\x18\x01 \x01(\t\x12\x18\n\x10\x65rikson_conflict\x18\x02 \x01(\t\x12\x15\n\rcognitive_age\x18\x03 \x01(\x02\x12\x19\n\x11interaction_count\x18\x04 \x01(\r\x12\x1b\n\x13milestones_achieved\x18\x05 \x03(\t\"\xbb\x06\n\x11PersonalityLedger\x12\x0e\n\x06ser_id\x18\x01 \x01(\t\x12\x1a\n\x12\x63ognitive_age_days\x18\x02 \x01(\r\x12\x14\n\x0cpiaget_stage\x18\x03 \x01(\t\x12=\n\x06hexaco\x18\x04 \x03(\x0b\x32-.serhu.identity.PersonalityLedger.HexacoEntry\x12N\n\x0ftci_temperament\x18\x05 \x03(\x0b\x32\x35.serhu.identity.PersonalityLedger.TciTemperamentEntry\x12J\n\rtci_character\x18\x06 \x03(\x0b\x32\x33.serhu.identity.PersonalityLedger.TciCharacterEntry\x12\x41\n\x08schwartz\x18\x07 \x03(\x0b\x32/.serhu.identity.PersonalityLedger.SchwartzEntry\x12\x35\n\x0b\x64\x65velopment\x18\x08 \x01(\x0b\x32 .serhu.identity.DevelopmentStage\x12\x0c\n\x04name\x18\t \x01(\t\x12\x10\n\x08language\x18\n \x01(\t\x12\x14\n\x0c\x63ore_beliefs\x18\x0b \x03(\t\x12\x17\n\x0fsurface_beliefs\x18\x0c \x03(\t\x1aJ\n\x0bHexacoEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12*\n\x05value\x18\x02 \x01(\x0b\x32\x1b.serhu.identity.HexacoFacet:\x02\x38\x01\x1aR\n\x13TciTemperamentEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12*\n\x05value\x18\x02 \x01(\x0b\x32\x1b.serhu.identity.TciSubscale:\x02\x38\x01\x1aP\n\x11TciCharacterEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12*\n\x05value\x18\x02 \x01(\x0b\x32\x1b.serhu.identity.TciSubscale:\x02\x38\x01\x1aN\n\rSchwartzEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12,\n\x05value\x18\x02 \x01(\x0b\x32\x1d.serhu.identity.SchwartzValue:\x02\x38\x01\"\xd1\x04\n\x10PersonalityEvent\x12\x10\n\x08\x65vent_id\x18\x01 \x01(\t\x12\x0e\n\x06ser_id\x18\x02 \x01(\t\x12-\n\nevent_type\x18\x03 \x01(\x0e\x32\x19.serhu.identity.EventType\x12-\n\ttimestamp\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x17\n\x0fsequence_number\x18\x05 \x01(\x04\x12:\n\x0ctrait_update\x18\n \x01(\x0b\x32\".serhu.identity.TraitUpdatePayloadH\x00\x12\x35\n\tmilestone\x18\x0b \x01(\x0b\x32 .serhu.identity.MilestonePayloadH\x00\x12\x42\n\x10stage_transition\x18\x0c \x01(\x0b\x32&.serhu.identity.StageTransitionPayloadH\x00\x12/\n\x06\x62\x65lief\x18\r \x01(\x0b\x32\x1d.serhu.identity.BeliefPayloadH\x00\x12\x38\n\x0bsleep_cycle\x18\x0e \x01(\x0b\x32!.serhu.identity.SleepCyclePayloadH\x00\x12\x39\n\x0binteraction\x18\x0f \x01(\x0b\x32\".serhu.identity.InteractionPayloadH\x00\x12<\n\rbeing_created\x18\x10 \x01(\x0b\x32#.serhu.identity.BeingCreatedPayloadH\x00\x42\t\n\x07payload\"\xa0\x01\n\x12TraitUpdatePayload\x12>\n\x06\x64\x65ltas\x18\x01 \x03(\x0b\x32..serhu.identity.TraitUpdatePayload.DeltasEntry\x1aJ\n\x0b\x44\x65ltasEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12*\n\x05value\x18\x02 \x01(\x0b\x32\x1b.serhu.identity.FacetDeltas:\x02\x38\x01\"u\n\x0b\x46\x61\x63\x65tDeltas\x12\x37\n\x06values\x18\x01 \x03(\x0b\x32\'.serhu.identity.FacetDeltas.ValuesEntry\x1a-\n\x0bValuesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x02:\x02\x38\x01\"C\n\x10MilestonePayload\x12\x14\n\x0cmilestone_id\x18\x01 \x01(\t\x12\x19\n\x11new_cognitive_age\x18\x02 \x01(\x02\"\\\n\x16StageTransitionPayload\x12\x12\n\nfrom_stage\x18\x01 \x01(\t\x12\x10\n\x08to_stage\x18\x02 \x01(\t\x12\x1c\n\x14new_erikson_conflict\x18\x03 \x01(\t\"5\n\rBeliefPayload\x12\x13\n\x0b\x62\x65lief_type\x18\x01 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x02 \x01(\t\"k\n\x11SleepCyclePayload\x12\x14\n\x0cnum_rollouts\x18\x01 \x01(\r\x12\x10\n\x08svd_rank\x18\x02 \x01(\r\x12\x17\n\x0f\x66\x61\x63ts_extracted\x18\x03 \x01(\r\x12\x15\n\rbeliefs_added\x18\x04 \x01(\r\"3\n\x12InteractionPayload\x12\x0c\n\x04role\x18\x01 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x02 \x01(\t\"5\n\x13\x42\x65ingCreatedPayload\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x10\n\x08language\x18\x02 \x01(\t\"\"\n\x10GetLedgerRequest\x12\x0e\n\x06ser_id\x18\x01 \x01(\t\"a\n\x13RecordEventResponse\x12\x17\n\x0fsequence_number\x18\x01 \x01(\x04\x12\x31\n\x06ledger\x18\x02 \x01(\x0b\x32!.serhu.identity.PersonalityLedger\"=\n\x13ReplayEventsRequest\x12\x0e\n\x06ser_id\x18\x01 \x01(\t\x12\x16\n\x0eup_to_sequence\x18\x02 \x01(\x04\"<\n\x13StreamEventsRequest\x12\x0e\n\x06ser_id\x18\x01 \x01(\t\x12\x15\n\rfrom_sequence\x18\x02 \x01(\x04*\xc2\x01\n\tEventType\x12\x1a\n\x16\x45VENT_TYPE_UNSPECIFIED\x10\x00\x12\x11\n\rBEING_CREATED\x10\x01\x12\x10\n\x0cTRAIT_UPDATE\x10\x02\x12\x16\n\x12MILESTONE_ACHIEVED\x10\x03\x12\x14\n\x10STAGE_TRANSITION\x10\x04\x12\x10\n\x0c\x42\x45LIEF_ADDED\x10\x05\x12\x19\n\x15SLEEP_CYCLE_COMPLETED\x10\x06\x12\x19\n\x15INTERACTION_PROCESSED\x10\x07\x32\xe7\x02\n\x0c\x42\x65ingService\x12P\n\tGetLedger\x12 .serhu.identity.GetLedgerRequest\x1a!.serhu.identity.PersonalityLedger\x12T\n\x0bRecordEvent\x12 .serhu.identity.PersonalityEvent\x1a#.serhu.identity.RecordEventResponse\x12V\n\x0cReplayEvents\x12#.serhu.identity.ReplayEventsRequest\x1a!.serhu.identity.PersonalityLedger\x12W\n\x0cStreamEvents\x12#.serhu.identity.StreamEventsRequest\x1a .serhu.identity.PersonalityEvent0\x01\x42\x16\n\x12\x63om.serhu.identityP\x01\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -40,22 +41,60 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_PERSONALITYLEDGER_TCICHARACTERENTRY']._serialized_options = b'8\001'
   _globals['_PERSONALITYLEDGER_SCHWARTZENTRY']._loaded_options = None
   _globals['_PERSONALITYLEDGER_SCHWARTZENTRY']._serialized_options = b'8\001'
-  _globals['_HEXACOFACET']._serialized_start=38
-  _globals['_HEXACOFACET']._serialized_end=66
-  _globals['_TCISUBSCALE']._serialized_start=68
-  _globals['_TCISUBSCALE']._serialized_end=96
-  _globals['_SCHWARTZVALUE']._serialized_start=98
-  _globals['_SCHWARTZVALUE']._serialized_end=128
-  _globals['_DEVELOPMENTSTAGE']._serialized_start=131
-  _globals['_DEVELOPMENTSTAGE']._serialized_end=269
-  _globals['_PERSONALITYLEDGER']._serialized_start=272
-  _globals['_PERSONALITYLEDGER']._serialized_end=1099
-  _globals['_PERSONALITYLEDGER_HEXACOENTRY']._serialized_start=779
-  _globals['_PERSONALITYLEDGER_HEXACOENTRY']._serialized_end=853
-  _globals['_PERSONALITYLEDGER_TCITEMPERAMENTENTRY']._serialized_start=855
-  _globals['_PERSONALITYLEDGER_TCITEMPERAMENTENTRY']._serialized_end=937
-  _globals['_PERSONALITYLEDGER_TCICHARACTERENTRY']._serialized_start=939
-  _globals['_PERSONALITYLEDGER_TCICHARACTERENTRY']._serialized_end=1019
-  _globals['_PERSONALITYLEDGER_SCHWARTZENTRY']._serialized_start=1021
-  _globals['_PERSONALITYLEDGER_SCHWARTZENTRY']._serialized_end=1099
+  _globals['_TRAITUPDATEPAYLOAD_DELTASENTRY']._loaded_options = None
+  _globals['_TRAITUPDATEPAYLOAD_DELTASENTRY']._serialized_options = b'8\001'
+  _globals['_FACETDELTAS_VALUESENTRY']._loaded_options = None
+  _globals['_FACETDELTAS_VALUESENTRY']._serialized_options = b'8\001'
+  _globals['_EVENTTYPE']._serialized_start=2708
+  _globals['_EVENTTYPE']._serialized_end=2902
+  _globals['_HEXACOFACET']._serialized_start=71
+  _globals['_HEXACOFACET']._serialized_end=99
+  _globals['_TCISUBSCALE']._serialized_start=101
+  _globals['_TCISUBSCALE']._serialized_end=129
+  _globals['_SCHWARTZVALUE']._serialized_start=131
+  _globals['_SCHWARTZVALUE']._serialized_end=161
+  _globals['_DEVELOPMENTSTAGE']._serialized_start=164
+  _globals['_DEVELOPMENTSTAGE']._serialized_end=302
+  _globals['_PERSONALITYLEDGER']._serialized_start=305
+  _globals['_PERSONALITYLEDGER']._serialized_end=1132
+  _globals['_PERSONALITYLEDGER_HEXACOENTRY']._serialized_start=812
+  _globals['_PERSONALITYLEDGER_HEXACOENTRY']._serialized_end=886
+  _globals['_PERSONALITYLEDGER_TCITEMPERAMENTENTRY']._serialized_start=888
+  _globals['_PERSONALITYLEDGER_TCITEMPERAMENTENTRY']._serialized_end=970
+  _globals['_PERSONALITYLEDGER_TCICHARACTERENTRY']._serialized_start=972
+  _globals['_PERSONALITYLEDGER_TCICHARACTERENTRY']._serialized_end=1052
+  _globals['_PERSONALITYLEDGER_SCHWARTZENTRY']._serialized_start=1054
+  _globals['_PERSONALITYLEDGER_SCHWARTZENTRY']._serialized_end=1132
+  _globals['_PERSONALITYEVENT']._serialized_start=1135
+  _globals['_PERSONALITYEVENT']._serialized_end=1728
+  _globals['_TRAITUPDATEPAYLOAD']._serialized_start=1731
+  _globals['_TRAITUPDATEPAYLOAD']._serialized_end=1891
+  _globals['_TRAITUPDATEPAYLOAD_DELTASENTRY']._serialized_start=1817
+  _globals['_TRAITUPDATEPAYLOAD_DELTASENTRY']._serialized_end=1891
+  _globals['_FACETDELTAS']._serialized_start=1893
+  _globals['_FACETDELTAS']._serialized_end=2010
+  _globals['_FACETDELTAS_VALUESENTRY']._serialized_start=1965
+  _globals['_FACETDELTAS_VALUESENTRY']._serialized_end=2010
+  _globals['_MILESTONEPAYLOAD']._serialized_start=2012
+  _globals['_MILESTONEPAYLOAD']._serialized_end=2079
+  _globals['_STAGETRANSITIONPAYLOAD']._serialized_start=2081
+  _globals['_STAGETRANSITIONPAYLOAD']._serialized_end=2173
+  _globals['_BELIEFPAYLOAD']._serialized_start=2175
+  _globals['_BELIEFPAYLOAD']._serialized_end=2228
+  _globals['_SLEEPCYCLEPAYLOAD']._serialized_start=2230
+  _globals['_SLEEPCYCLEPAYLOAD']._serialized_end=2337
+  _globals['_INTERACTIONPAYLOAD']._serialized_start=2339
+  _globals['_INTERACTIONPAYLOAD']._serialized_end=2390
+  _globals['_BEINGCREATEDPAYLOAD']._serialized_start=2392
+  _globals['_BEINGCREATEDPAYLOAD']._serialized_end=2445
+  _globals['_GETLEDGERREQUEST']._serialized_start=2447
+  _globals['_GETLEDGERREQUEST']._serialized_end=2481
+  _globals['_RECORDEVENTRESPONSE']._serialized_start=2483
+  _globals['_RECORDEVENTRESPONSE']._serialized_end=2580
+  _globals['_REPLAYEVENTSREQUEST']._serialized_start=2582
+  _globals['_REPLAYEVENTSREQUEST']._serialized_end=2643
+  _globals['_STREAMEVENTSREQUEST']._serialized_start=2645
+  _globals['_STREAMEVENTSREQUEST']._serialized_end=2705
+  _globals['_BEINGSERVICE']._serialized_start=2905
+  _globals['_BEINGSERVICE']._serialized_end=3264
 # @@protoc_insertion_point(module_scope)
