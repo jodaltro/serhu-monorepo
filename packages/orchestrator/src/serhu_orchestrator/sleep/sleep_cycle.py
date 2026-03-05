@@ -55,6 +55,10 @@ class SleepCycle:
         The engine for dream rollouts and SVD consolidation.
     """
 
+    # Canonical ordering of personality models for vector flattening.
+    # HEXACO (24) + TCI-T (16) + TCI-C (13) + Schwartz (19) = 72 dims.
+    _TRAIT_MODEL_ATTRS = ("hexaco", "tci_temperament", "tci_character", "schwartz")
+
     def __init__(self, dream_engine: DreamEngine | None = None) -> None:
         self.dream_engine = dream_engine or DreamEngine()
 
@@ -146,7 +150,8 @@ class SleepCycle:
         Order: HEXACO (24) + TCI-T (16) + TCI-C (13) + Schwartz (19) = 72 dims.
         """
         vector: list[float] = []
-        for model in (state.hexaco, state.tci_temperament, state.tci_character, state.schwartz):
+        for attr in SleepCycle._TRAIT_MODEL_ATTRS:
+            model = getattr(state, attr)
             for field_name in type(model).model_fields:
                 vector.append(getattr(model, field_name))
         return vector
@@ -158,7 +163,8 @@ class SleepCycle:
     ) -> PersonalityState:
         """Write consolidated trait values back into the personality state."""
         idx = 0
-        for model in (state.hexaco, state.tci_temperament, state.tci_character, state.schwartz):
+        for attr in SleepCycle._TRAIT_MODEL_ATTRS:
+            model = getattr(state, attr)
             for field_name in type(model).model_fields:
                 if idx < len(consolidated):
                     setattr(model, field_name, max(0.0, min(1.0, consolidated[idx])))

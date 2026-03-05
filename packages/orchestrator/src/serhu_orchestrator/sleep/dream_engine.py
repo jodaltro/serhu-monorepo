@@ -174,7 +174,7 @@ class DreamEngine:
         ]
 
         # 3. Power-iteration to find the top singular vector
-        v = [self_rng_val for self_rng_val in [1.0 / math.sqrt(cols)] * cols]
+        v = [1.0 / math.sqrt(cols)] * cols
         for _ in range(50):  # iterations
             # Matrix-transpose * matrix * v
             u = [sum(centred[r][c] * v[c] for c in range(cols)) for r in range(rows)]
@@ -224,7 +224,7 @@ class DreamEngine:
 
         if self._rng.random() < exploration_prob and context:
             # Explore: combine elements from context
-            idx = self._rng.randint(0, max(0, len(context) - 1))
+            idx = self._rng.randint(0, len(context) - 1)
             base = context[idx]
             action = f"hypothesis_about:{base[:50]}"
             complexity = len(base) / 100.0
