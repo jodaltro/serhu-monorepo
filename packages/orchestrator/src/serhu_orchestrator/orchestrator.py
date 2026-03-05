@@ -4,16 +4,27 @@ The top-level controller that ties memory management and personality evolution
 together, implementing the MemGPT-like "operating system" for the Being's mind.
 
 Lifecycle phases:
-    1. **Wakefulness** – Active interaction via ``process_message()``.
+    1. **Wakefulness** – Active interaction via ``process_message()`` or ``chat()``.
     2. **Twilight**    – Consolidation via ``consolidate()``.
     3. **Sleep NREM**  – SVD rank-reduction / dream pruning via ``sleep()``.
     4. **Sleep REM**   – AIXI hypothesis generation via ``sleep()``.
+
+When an ``LLMClient`` is provided (e.g. ``OpenAIClient`` for GPT-5.4),
+the Orchestrator can:
+- Generate Being responses via ``chat()`` with personality-aware prompts.
+- Automatically extract trait deltas from conversations.
+- Enhance sleep-cycle semantization and belief derivation.
+
+Without an LLM client, only ``process_message()`` is available for
+wakefulness interactions, and the sleep cycle falls back to rule-based
+semantization and belief extraction.
 
 References:
     - MemGPT: https://informationmatters.org/2025/10/memgpt-engineering-semantic-memory/
     - Piaget in AI: https://gregrobison.medium.com/active-learning-machines-...
     - AIXI: https://www.alignmentforum.org/w/aixi
     - Dream Pruning: https://pub.towardsai.net/dream-pruning-what-happens-when-ai-models-sleep-3db3c404e24a
+    - GPT-5.4: https://openai.com/index/introducing-gpt-5/
 """
 
 from __future__ import annotations
@@ -55,6 +66,9 @@ class Orchestrator:
         Qdrant collection name.
     embed_fn : callable | None
         Embedding function ``(text) -> list[float]``.
+    llm_client : object | None
+        An object satisfying the ``LLMClient`` protocol (e.g. ``OpenAIClient``).
+        Enables GPT-5.4-powered chat, trait extraction, and enhanced sleep.
     """
 
     def __init__(
@@ -70,7 +84,11 @@ class Orchestrator:
         working_memory_size: int = 50,
         collection_name: str = "serhu_archival",
         embed_fn: callable | None = None,
+        llm_client: object | None = None,
     ) -> None:
+        # -- LLM client (optional) -------------------------------------------
+        self._llm = llm_client
+
         # -- memory tiers ----------------------------------------------------
         self._working = WorkingMemory(max_entries=working_memory_size)
         self._archival = ArchivalMemory(
@@ -152,6 +170,85 @@ class Orchestrator:
             )
 
         return context
+
+    def chat(
+        self,
+        user_message: str,
+        *,
+        auto_traits: bool = True,
+        metadata: dict | None = None,
+    ) -> tuple[str, ContextWindow]:
+        """Full chat turn: process user message → LLM response → trait analysis.
+
+        This is the high-level wakefulness API that uses the LLM to:
+        1. Build a persona-aware system prompt.
+        2. Assemble the conversation context.
+        3. Generate the Being's response via GPT-5.4.
+        4. (Optionally) extract personality trait deltas from the exchange.
+
+        Requires an ``llm_client`` to be configured on the Orchestrator.
+
+        Parameters
+        ----------
+        user_message : str
+            The user's input message.
+        auto_traits : bool
+            If ``True``, uses the LLM to automatically extract trait deltas
+            from the conversation turn.
+        metadata : dict | None
+            Optional metadata for the interaction.
+
+        Returns
+        -------
+        tuple[str, ContextWindow]
+            The Being's response text and the assembled context window.
+
+        Raises
+        ------
+        RuntimeError
+            If no LLM client is configured.
+        """
+        if self._llm is None:
+            raise RuntimeError(
+                "chat() requires an LLM client. "
+                "Pass llm_client=OpenAIClient(...) to the Orchestrator."
+            )
+
+        # 1. Process user message into memory
+        context = self._memory_manager.add_interaction("user", user_message, metadata)
+
+        # 2. Build persona-aware system prompt
+        system_prompt = build_system_prompt(self._personality)
+
+        # 3. Assemble conversation history from working memory
+        messages = [
+            {"role": entry.role, "content": entry.content}
+            for entry in context.working
+        ]
+
+        # 4. Generate Being's response via LLM
+        llm_response = self._llm.chat(system_prompt, messages)
+        being_response = llm_response.content
+
+        # 5. Store Being's response in memory
+        context = self._memory_manager.add_interaction("being", being_response)
+
+        # 6. Optionally extract trait deltas
+        trait_deltas = None
+        if auto_traits:
+            try:
+                trait_deltas = self._llm.analyze_traits(
+                    system_prompt, user_message, being_response
+                )
+            except Exception:
+                pass
+
+        if trait_deltas:
+            self._personality = self._personality_engine.update_traits(
+                self._personality, trait_deltas
+            )
+
+        return being_response, context
 
     # -- twilight phase ------------------------------------------------------
 
@@ -243,7 +340,7 @@ class Orchestrator:
 
         # Run the sleep cycle
         dream_engine = DreamEngine(seed=seed)
-        cycle = SleepCycle(dream_engine=dream_engine)
+        cycle = SleepCycle(dream_engine=dream_engine, llm_client=self._llm)
         self._personality, result = cycle.run(
             self._personality,
             episodes,

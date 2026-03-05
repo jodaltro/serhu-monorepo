@@ -1,0 +1,512 @@
+"""Unit tests for LLM integration – OpenAIClient and Orchestrator.chat()."""
+
+import json
+
+import pytest
+from unittest.mock import MagicMock, patch, PropertyMock
+
+from serhu_orchestrator.llm.llm_client import LLMClient, LLMResponse
+from serhu_orchestrator.llm.openai_client import OpenAIClient
+from serhu_orchestrator.personality.types import PersonalityState
+from serhu_orchestrator.sleep.dream_engine import DreamEngine, Hypothesis
+from serhu_orchestrator.sleep.sleep_cycle import SleepCycle, SleepResult
+
+
+# ---------------------------------------------------------------------------
+# LLMResponse dataclass
+# ---------------------------------------------------------------------------
+
+
+class TestLLMResponse:
+    def test_default_fields(self):
+        resp = LLMResponse(content="hello")
+        assert resp.content == "hello"
+        assert resp.model == ""
+        assert resp.usage == {}
+
+    def test_custom_fields(self):
+        resp = LLMResponse(
+            content="response",
+            model="gpt-5.4",
+            usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+        )
+        assert resp.model == "gpt-5.4"
+        assert resp.usage["total_tokens"] == 15
+
+
+# ---------------------------------------------------------------------------
+# LLMClient protocol
+# ---------------------------------------------------------------------------
+
+
+class TestLLMClientProtocol:
+    def test_mock_satisfies_protocol(self):
+        mock = MagicMock()
+        mock.chat = MagicMock(return_value=LLMResponse(content="ok"))
+        mock.analyze_traits = MagicMock(return_value={})
+        mock.extract_semantic_facts = MagicMock(return_value=[])
+        mock.derive_beliefs = MagicMock(return_value=[])
+        assert isinstance(mock, LLMClient)
+
+
+# ---------------------------------------------------------------------------
+# OpenAIClient – parsing helpers
+# ---------------------------------------------------------------------------
+
+
+class TestOpenAIClientParsing:
+    """Tests for the JSON parsing methods (no actual API calls)."""
+
+    def test_parse_trait_deltas_valid(self):
+        raw = json.dumps({
+            "hexaco": {"sincerity": 0.03, "creativity": -0.02},
+            "tci_character": {"empathy": 0.01},
+        })
+        result = OpenAIClient._parse_trait_deltas(raw)
+        assert result["hexaco"]["sincerity"] == 0.03
+        assert result["hexaco"]["creativity"] == -0.02
+        assert result["tci_character"]["empathy"] == 0.01
+
+    def test_parse_trait_deltas_clamps_values(self):
+        raw = json.dumps({"hexaco": {"sincerity": 0.5}})
+        result = OpenAIClient._parse_trait_deltas(raw)
+        assert result["hexaco"]["sincerity"] == 0.05  # clamped
+
+    def test_parse_trait_deltas_empty(self):
+        result = OpenAIClient._parse_trait_deltas("{}")
+        assert result == {}
+
+    def test_parse_trait_deltas_invalid_json(self):
+        result = OpenAIClient._parse_trait_deltas("not json")
+        assert result == {}
+
+    def test_parse_trait_deltas_rejects_invalid_models(self):
+        raw = json.dumps({"invalid_model": {"trait": 0.01}})
+        result = OpenAIClient._parse_trait_deltas(raw)
+        assert result == {}
+
+    def test_parse_trait_deltas_strips_code_fence(self):
+        raw = '```json\n{"hexaco": {"sincerity": 0.02}}\n```'
+        result = OpenAIClient._parse_trait_deltas(raw)
+        assert result["hexaco"]["sincerity"] == 0.02
+
+    def test_parse_string_list_valid(self):
+        raw = json.dumps(["fact one", "fact two"])
+        result = OpenAIClient._parse_string_list(raw)
+        assert result == ["fact one", "fact two"]
+
+    def test_parse_string_list_empty(self):
+        result = OpenAIClient._parse_string_list("[]")
+        assert result == []
+
+    def test_parse_string_list_invalid(self):
+        result = OpenAIClient._parse_string_list("not json")
+        assert result == []
+
+    def test_parse_string_list_strips_code_fence(self):
+        raw = '```json\n["a", "b"]\n```'
+        result = OpenAIClient._parse_string_list(raw)
+        assert result == ["a", "b"]
+
+    def test_parse_string_list_filters_empty_items(self):
+        raw = json.dumps(["good", "", "also good", None])
+        result = OpenAIClient._parse_string_list(raw)
+        assert result == ["good", "also good"]
+
+
+# ---------------------------------------------------------------------------
+# OpenAIClient – chat with mocked API
+# ---------------------------------------------------------------------------
+
+
+def _mock_completion(content: str, model: str = "gpt-5.4"):
+    """Create a mock OpenAI completion response."""
+    mock_resp = MagicMock()
+    mock_resp.choices = [MagicMock()]
+    mock_resp.choices[0].message.content = content
+    mock_resp.model = model
+    mock_resp.usage.prompt_tokens = 100
+    mock_resp.usage.completion_tokens = 50
+    mock_resp.usage.total_tokens = 150
+    return mock_resp
+
+
+class TestOpenAIClientChat:
+    def test_chat_returns_llm_response(self):
+        with patch("serhu_orchestrator.llm.openai_client.OpenAI") as MockOpenAI:
+            mock_instance = MagicMock()
+            mock_instance.chat.completions.create.return_value = _mock_completion(
+                "Hello, I am a Being!"
+            )
+            MockOpenAI.return_value = mock_instance
+
+            client = OpenAIClient(api_key="test-key")
+            resp = client.chat(
+                system_prompt="<being>...</being>",
+                messages=[{"role": "user", "content": "Hi"}],
+            )
+
+            assert isinstance(resp, LLMResponse)
+            assert resp.content == "Hello, I am a Being!"
+            assert resp.model == "gpt-5.4"
+            assert resp.usage["total_tokens"] == 150
+
+    def test_chat_passes_system_prompt_and_messages(self):
+        with patch("serhu_orchestrator.llm.openai_client.OpenAI") as MockOpenAI:
+            mock_instance = MagicMock()
+            mock_instance.chat.completions.create.return_value = _mock_completion("ok")
+            MockOpenAI.return_value = mock_instance
+
+            client = OpenAIClient(api_key="test-key", model="gpt-5.4")
+            client.chat(
+                system_prompt="sys prompt",
+                messages=[{"role": "user", "content": "msg"}],
+                temperature=0.5,
+                max_tokens=512,
+            )
+
+            call_args = mock_instance.chat.completions.create.call_args
+            assert call_args.kwargs["model"] == "gpt-5.4"
+            assert call_args.kwargs["temperature"] == 0.5
+            assert call_args.kwargs["max_tokens"] == 512
+            msgs = call_args.kwargs["messages"]
+            assert msgs[0]["role"] == "system"
+            assert msgs[0]["content"] == "sys prompt"
+            assert msgs[1]["role"] == "user"
+            assert msgs[1]["content"] == "msg"
+
+
+class TestOpenAIClientAnalyzeTraits:
+    def test_analyze_traits_returns_deltas(self):
+        with patch("serhu_orchestrator.llm.openai_client.OpenAI") as MockOpenAI:
+            mock_instance = MagicMock()
+            mock_instance.chat.completions.create.return_value = _mock_completion(
+                json.dumps({"hexaco": {"sincerity": 0.03}})
+            )
+            MockOpenAI.return_value = mock_instance
+
+            client = OpenAIClient(api_key="test-key")
+            deltas = client.analyze_traits(
+                system_prompt="<being>...</being>",
+                conversation_turn="Tell me about honesty",
+                being_response="Honesty is important to me",
+            )
+
+            assert deltas == {"hexaco": {"sincerity": 0.03}}
+
+    def test_analyze_traits_handles_empty_response(self):
+        with patch("serhu_orchestrator.llm.openai_client.OpenAI") as MockOpenAI:
+            mock_instance = MagicMock()
+            mock_instance.chat.completions.create.return_value = _mock_completion("{}")
+            MockOpenAI.return_value = mock_instance
+
+            client = OpenAIClient(api_key="test-key")
+            deltas = client.analyze_traits("prompt", "msg", "resp")
+            assert deltas == {}
+
+
+class TestOpenAIClientSemanticFacts:
+    def test_extract_semantic_facts(self):
+        with patch("serhu_orchestrator.llm.openai_client.OpenAI") as MockOpenAI:
+            mock_instance = MagicMock()
+            mock_instance.chat.completions.create.return_value = _mock_completion(
+                json.dumps(["The user loves astronomy", "Stars are a key interest"])
+            )
+            MockOpenAI.return_value = mock_instance
+
+            client = OpenAIClient(api_key="test-key")
+            facts = client.extract_semantic_facts(
+                episodes=[{"role": "user", "content": "I love stars"}],
+                personality_summary="Name: Luna, Stage: sensorimotor",
+            )
+
+            assert len(facts) == 2
+            assert "astronomy" in facts[0]
+
+
+class TestOpenAIClientDeriveBeliefs:
+    def test_derive_beliefs(self):
+        with patch("serhu_orchestrator.llm.openai_client.OpenAI") as MockOpenAI:
+            mock_instance = MagicMock()
+            mock_instance.chat.completions.create.return_value = _mock_completion(
+                json.dumps(["The world is full of wonder"])
+            )
+            MockOpenAI.return_value = mock_instance
+
+            client = OpenAIClient(api_key="test-key")
+            beliefs = client.derive_beliefs(
+                hypotheses=["hypothesis_about:stars"],
+                personality_summary="Name: Luna",
+            )
+
+            assert len(beliefs) == 1
+            assert "wonder" in beliefs[0]
+
+
+# ---------------------------------------------------------------------------
+# SleepCycle with LLM enhancement
+# ---------------------------------------------------------------------------
+
+
+class TestSleepCycleWithLLM:
+    """Tests for LLM-enhanced sleep cycle phases."""
+
+    def _make_state(self) -> PersonalityState:
+        return PersonalityState(being_id="llm-sleep-test", name="Dreamer")
+
+    def _make_llm_mock(self) -> MagicMock:
+        llm = MagicMock()
+        llm.extract_semantic_facts.return_value = [
+            "The user frequently discusses astronomy",
+            "Stars are emotionally significant to the user",
+        ]
+        llm.derive_beliefs.return_value = [
+            "The universe is vast and beautiful",
+        ]
+        return llm
+
+    def test_llm_semantization_is_used_when_available(self):
+        llm_mock = self._make_llm_mock()
+        cycle = SleepCycle(
+            dream_engine=DreamEngine(seed=42),
+            llm_client=llm_mock,
+        )
+
+        episodes = [{"content": "Stars are beautiful"}]
+        facts = cycle._semantize(episodes, self._make_state())
+
+        llm_mock.extract_semantic_facts.assert_called_once()
+        assert len(facts) == 2
+        assert "astronomy" in facts[0]
+
+    def test_llm_belief_derivation_is_used_when_available(self):
+        llm_mock = self._make_llm_mock()
+        cycle = SleepCycle(
+            dream_engine=DreamEngine(seed=42),
+            llm_client=llm_mock,
+        )
+
+        hypotheses = [
+            Hypothesis(action="stars_are_important", reward=0.8, complexity=0.1),
+        ]
+        beliefs = cycle._extract_beliefs(hypotheses, self._make_state())
+
+        llm_mock.derive_beliefs.assert_called_once()
+        assert len(beliefs) == 1
+        assert "universe" in beliefs[0]
+
+    def test_llm_fallback_on_semantization_error(self):
+        llm_mock = MagicMock()
+        llm_mock.extract_semantic_facts.side_effect = Exception("API error")
+        cycle = SleepCycle(
+            dream_engine=DreamEngine(seed=42),
+            llm_client=llm_mock,
+        )
+
+        episodes = [
+            {"content": "painting is great"},
+            {"content": "painting is art"},
+        ]
+        facts = cycle._semantize(episodes, self._make_state())
+
+        # Should fall back to rule-based
+        assert any("painting" in f.lower() for f in facts)
+
+    def test_llm_fallback_on_belief_error(self):
+        llm_mock = MagicMock()
+        llm_mock.derive_beliefs.side_effect = Exception("API error")
+        cycle = SleepCycle(
+            dream_engine=DreamEngine(seed=42),
+            llm_client=llm_mock,
+        )
+
+        hypotheses = [
+            Hypothesis(action="test_action", reward=0.5, complexity=0.1),
+        ]
+        beliefs = cycle._extract_beliefs(hypotheses, self._make_state())
+
+        # Should fall back to rule-based
+        assert any("Learned:" in b for b in beliefs)
+
+    def test_full_cycle_with_llm(self):
+        llm_mock = self._make_llm_mock()
+        cycle = SleepCycle(
+            dream_engine=DreamEngine(seed=42),
+            llm_client=llm_mock,
+        )
+
+        state = self._make_state()
+        episodes = [
+            {"content": "Stars are beautiful"},
+            {"content": "The night sky is amazing"},
+        ]
+        new_state, result = cycle.run(state, episodes, num_rollouts=50, svd_rank=4)
+
+        assert isinstance(result, SleepResult)
+        # LLM-extracted facts
+        assert "astronomy" in result.facts_extracted[0]
+        # LLM-derived beliefs
+        assert "universe" in result.beliefs_added[0]
+        # SVD consolidation still works
+        assert len(result.traits_before) == 72
+        assert len(result.traits_after) == 72
+
+    def test_no_llm_uses_rule_based(self):
+        cycle = SleepCycle(dream_engine=DreamEngine(seed=42))
+
+        state = self._make_state()
+        episodes = [
+            {"content": "painting is great"},
+            {"content": "painting is art"},
+        ]
+        new_state, result = cycle.run(state, episodes, num_rollouts=50)
+
+        # Rule-based fallback
+        assert any("painting" in f.lower() for f in result.facts_extracted)
+        assert all("Learned:" in b for b in result.beliefs_added)
+
+
+# ---------------------------------------------------------------------------
+# Orchestrator.chat() with LLM
+# ---------------------------------------------------------------------------
+
+
+class TestOrchestratorChat:
+    """Tests for the LLM-powered chat method."""
+
+    def test_chat_requires_llm_client(self):
+        from serhu_orchestrator.orchestrator import Orchestrator
+        from tests.e2e.conftest import InMemoryArchival, InMemoryRelational
+
+        with (
+            patch("serhu_orchestrator.orchestrator.ArchivalMemory", InMemoryArchival),
+            patch("serhu_orchestrator.orchestrator.RelationalMemory", InMemoryRelational),
+        ):
+            orch = Orchestrator(
+                qdrant_url="mock://q",
+                qdrant_api_key="k",
+                supabase_url="mock://s",
+                supabase_key="k",
+                being_name="TestBeing",
+            )
+
+            with pytest.raises(RuntimeError, match="chat.*requires.*LLM"):
+                orch.chat("Hello")
+
+    def test_chat_generates_response(self):
+        from serhu_orchestrator.orchestrator import Orchestrator
+        from tests.e2e.conftest import InMemoryArchival, InMemoryRelational
+
+        llm_mock = MagicMock()
+        llm_mock.chat.return_value = LLMResponse(
+            content="Hello! I am a newborn Being.",
+            model="gpt-5.4",
+        )
+        llm_mock.analyze_traits.return_value = {
+            "hexaco": {"sociability": 0.02},
+        }
+
+        with (
+            patch("serhu_orchestrator.orchestrator.ArchivalMemory", InMemoryArchival),
+            patch("serhu_orchestrator.orchestrator.RelationalMemory", InMemoryRelational),
+        ):
+            orch = Orchestrator(
+                qdrant_url="mock://q",
+                qdrant_api_key="k",
+                supabase_url="mock://s",
+                supabase_key="k",
+                being_name="ChatBeing",
+                llm_client=llm_mock,
+            )
+
+            response, context = orch.chat("Hello there!")
+
+            assert response == "Hello! I am a newborn Being."
+            llm_mock.chat.assert_called_once()
+            llm_mock.analyze_traits.assert_called_once()
+            # Trait was updated
+            assert orch.personality.hexaco.sociability == pytest.approx(0.52, abs=0.001)
+            # Both user and being messages stored
+            assert len(context.working) >= 2
+
+    def test_chat_without_auto_traits(self):
+        from serhu_orchestrator.orchestrator import Orchestrator
+        from tests.e2e.conftest import InMemoryArchival, InMemoryRelational
+
+        llm_mock = MagicMock()
+        llm_mock.chat.return_value = LLMResponse(content="Response")
+
+        with (
+            patch("serhu_orchestrator.orchestrator.ArchivalMemory", InMemoryArchival),
+            patch("serhu_orchestrator.orchestrator.RelationalMemory", InMemoryRelational),
+        ):
+            orch = Orchestrator(
+                qdrant_url="mock://q",
+                qdrant_api_key="k",
+                supabase_url="mock://s",
+                supabase_key="k",
+                being_name="NoTraitsBeing",
+                llm_client=llm_mock,
+            )
+
+            response, _ = orch.chat("Hello", auto_traits=False)
+
+            assert response == "Response"
+            llm_mock.analyze_traits.assert_not_called()
+            # Sociability should remain at default
+            assert orch.personality.hexaco.sociability == 0.5
+
+    def test_chat_handles_trait_analysis_error(self):
+        from serhu_orchestrator.orchestrator import Orchestrator
+        from tests.e2e.conftest import InMemoryArchival, InMemoryRelational
+
+        llm_mock = MagicMock()
+        llm_mock.chat.return_value = LLMResponse(content="Response")
+        llm_mock.analyze_traits.side_effect = Exception("API error")
+
+        with (
+            patch("serhu_orchestrator.orchestrator.ArchivalMemory", InMemoryArchival),
+            patch("serhu_orchestrator.orchestrator.RelationalMemory", InMemoryRelational),
+        ):
+            orch = Orchestrator(
+                qdrant_url="mock://q",
+                qdrant_api_key="k",
+                supabase_url="mock://s",
+                supabase_key="k",
+                being_name="ErrorBeing",
+                llm_client=llm_mock,
+            )
+
+            # Should not raise, just skip trait update
+            response, _ = orch.chat("Hello")
+            assert response == "Response"
+
+    def test_sleep_with_llm_client(self):
+        from serhu_orchestrator.orchestrator import Orchestrator
+        from tests.e2e.conftest import InMemoryArchival, InMemoryRelational
+
+        llm_mock = MagicMock()
+        llm_mock.extract_semantic_facts.return_value = ["User loves nature"]
+        llm_mock.derive_beliefs.return_value = ["Nature is healing"]
+
+        with (
+            patch("serhu_orchestrator.orchestrator.ArchivalMemory", InMemoryArchival),
+            patch("serhu_orchestrator.orchestrator.RelationalMemory", InMemoryRelational),
+        ):
+            orch = Orchestrator(
+                qdrant_url="mock://q",
+                qdrant_api_key="k",
+                supabase_url="mock://s",
+                supabase_key="k",
+                being_name="SleepBeing",
+                llm_client=llm_mock,
+            )
+
+            # Add some episodes
+            for i in range(5):
+                orch.process_message("user", f"Nature is beautiful {i}")
+
+            result = orch.sleep(num_rollouts=50, svd_rank=4, seed=42)
+
+            assert "User loves nature" in result.facts_extracted
+            assert "Nature is healing" in result.beliefs_added
