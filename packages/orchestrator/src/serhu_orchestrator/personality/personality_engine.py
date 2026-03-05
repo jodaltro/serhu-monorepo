@@ -1,8 +1,8 @@
 """Personality Engine – Tabula rasa initialization and trait evolution.
 
 Manages the lifecycle of a Being's personality: creation as a blank slate,
-incremental updates based on interaction analysis, and persistence through
-the relational memory tier.
+incremental updates based on interaction analysis, milestone-based cognitive
+age advancement, and persistence through the relational memory tier.
 
 References:
     - Profile-LLM dynamic optimization: https://arxiv.org/html/2511.19852v1
@@ -19,26 +19,13 @@ from serhu_orchestrator.personality.types import (
     HexacoFacets,
     PersonalityState,
     SchwartzValues,
+    STAGE_AGE_RANGES,
+    STAGE_MILESTONES,
+    STAGE_ORDER,
     TciCharacter,
     TciTemperament,
 )
 from serhu_orchestrator.memory.relational_memory import RelationalMemory
-
-
-# Stage transition thresholds (interaction counts)
-_STAGE_THRESHOLDS = {
-    "sensorimotor": 0,
-    "preoperational": 50,
-    "concrete_operational": 200,
-    "formal_operational": 500,
-}
-
-_STAGE_ORDER = [
-    "sensorimotor",
-    "preoperational",
-    "concrete_operational",
-    "formal_operational",
-]
 
 
 class PersonalityEngine:
@@ -62,7 +49,7 @@ class PersonalityEngine:
         - TCI-R temperament starts at 0.5 (neutral)
         - TCI-R character starts at 0.0 (must be built)
         - Schwartz values start at 0.0 (unformed)
-        - Development stage: sensorimotor, age 0
+        - Development stage: sensorimotor, age 0, no milestones
 
         Returns
         -------
@@ -140,9 +127,59 @@ class PersonalityEngine:
                     new_val = max(0.0, min(1.0, current + delta))
                     setattr(model, facet_name, new_val)
 
-        # Advance development
+        # Advance interaction count (age does NOT advance here)
         state.development.interaction_count += 1
-        state.development.cognitive_age += 0.1  # ~1 month per 10 interactions
+
+        self._persist(state)
+        return state
+
+    # -- milestone tracking --------------------------------------------------
+
+    def record_milestone(
+        self,
+        state: PersonalityState,
+        milestone_id: str,
+    ) -> PersonalityState:
+        """Record the achievement of a developmental milestone.
+
+        The cognitive_age only advances when milestones are achieved.
+        Each achieved milestone advances the age by a fraction proportional
+        to the current stage's age span divided by its total milestones.
+
+        When ALL milestones for the current stage are complete the Being
+        transitions to the next Piaget stage.
+
+        Parameters
+        ----------
+        state : PersonalityState
+            Current personality state.
+        milestone_id : str
+            Identifier of the achieved milestone (must belong to the current
+            stage or a previous stage).
+
+        Returns
+        -------
+        PersonalityState
+            Updated personality state (persisted automatically).
+        """
+        if milestone_id in state.development.milestones_achieved:
+            return state  # already recorded
+
+        current_stage = state.development.stage
+        current_milestones = STAGE_MILESTONES.get(current_stage, [])
+
+        # Only accept milestones that belong to the current stage
+        if milestone_id not in current_milestones:
+            return state
+
+        state.development.milestones_achieved.append(milestone_id)
+
+        # Advance cognitive age proportionally within the stage's age range
+        age_start, age_end = STAGE_AGE_RANGES[current_stage]
+        age_increment = (age_end - age_start) / max(len(current_milestones), 1)
+        state.development.cognitive_age += age_increment
+
+        # Check if all milestones for the current stage are complete
         state = self._check_stage_transition(state)
 
         self._persist(state)
@@ -151,15 +188,29 @@ class PersonalityEngine:
     # -- internal ------------------------------------------------------------
 
     def _check_stage_transition(self, state: PersonalityState) -> PersonalityState:
-        """Check if the Being should advance to the next Piaget stage."""
-        count = state.development.interaction_count
-        current_idx = _STAGE_ORDER.index(state.development.stage)
+        """Check if the Being should advance to the next Piaget stage.
 
-        for i in range(len(_STAGE_ORDER) - 1, -1, -1):
-            stage_name = _STAGE_ORDER[i]
-            if count >= _STAGE_THRESHOLDS[stage_name] and i > current_idx:
-                state.development.stage = stage_name
-                break
+        Stage advancement requires ALL milestones of the current stage
+        to be achieved.  This follows Piaget's theory that cognitive
+        stages are sequential and each builds upon the previous one.
+        """
+        current_stage = state.development.stage
+        current_idx = STAGE_ORDER.index(current_stage)
+
+        # Already at the final stage
+        if current_idx >= len(STAGE_ORDER) - 1:
+            return state
+
+        required = set(STAGE_MILESTONES.get(current_stage, []))
+        achieved = set(state.development.milestones_achieved)
+
+        if required and required.issubset(achieved):
+            next_stage = STAGE_ORDER[current_idx + 1]
+            state.development.stage = next_stage
+            # Snap age to the start of the new stage
+            new_start, _ = STAGE_AGE_RANGES[next_stage]
+            if state.development.cognitive_age < new_start:
+                state.development.cognitive_age = new_start
 
         return state
 

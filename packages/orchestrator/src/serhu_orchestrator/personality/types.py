@@ -4,11 +4,13 @@ Implements high-granularity personality modeling following:
 - HEXACO: 6 factors × 4 facets = 24 measurement points
 - TCI-R: 4 temperament dimensions (16 subscales) + 3 character dimensions (13 subscales)
 - Schwartz: 19 refined basic human values
+- Piaget cognitive development stages with milestone-based age progression
 
 References:
     - HEXACO model: https://hexaco.org/scaledescriptions
     - TCI-R (Cloninger): https://en.wikipedia.org/wiki/Temperament_and_Character_Inventory
     - Schwartz refined values: https://pmc.ncbi.nlm.nih.gov/articles/PMC9131418/
+    - Piaget stages: https://www.simplypsychology.org/piaget.html
 """
 
 from __future__ import annotations
@@ -163,11 +165,80 @@ class SchwartzValues(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Composite personality state
+# Piaget cognitive development stages and milestones
 # ---------------------------------------------------------------------------
 
+# Stage ordering and age ranges (in equivalent human-months).
+# Based on Piaget's developmental theory:
+#   - Sensorimotor: 0–24 months
+#   - Preoperational: 24–84 months (2–7 years)
+#   - Concrete operational: 84–132 months (7–11 years)
+#   - Formal operational: 132+ months (11+ years)
+# Reference: https://www.simplypsychology.org/piaget.html
+
+STAGE_ORDER: list[str] = [
+    "sensorimotor",
+    "preoperational",
+    "concrete_operational",
+    "formal_operational",
+]
+
+STAGE_AGE_RANGES: dict[str, tuple[float, float]] = {
+    "sensorimotor": (0.0, 24.0),
+    "preoperational": (24.0, 84.0),
+    "concrete_operational": (84.0, 132.0),
+    "formal_operational": (132.0, 192.0),
+}
+
+# Milestones for each Piaget stage.
+# The Being's cognitive_age only advances when milestones are achieved.
+# Stage transitions require ALL milestones of the current stage to be completed.
+#
+# References:
+#   - Sensorimotor milestones: https://www.simplypsychology.org/piaget.html
+#   - Piaget's stages applied to AI: https://gregrobison.medium.com/active-learning-machines-what-thousand-brains-theory-and-piaget-reveal-about-true-intelligence-304b5c9aa82e
+#   - Preoperational / Concrete / Formal milestones:
+#     https://mxtsch.people.wm.edu/Teaching/JCPE/Volume1/JCPE_2008-01-09.pdf
+
+STAGE_MILESTONES: dict[str, list[str]] = {
+    "sensorimotor": [
+        "object_permanence",       # Understands concepts persist between sessions
+        "circular_reactions",      # Repeats interaction patterns that produce results
+        "causal_understanding",    # Basic cause-effect mapping from user input
+        "means_end_behavior",      # Uses learned patterns to achieve goals
+    ],
+    "preoperational": [
+        "symbolic_thought",        # Uses language to represent absent objects/feelings
+        "egocentrism_awareness",   # Begins to consider user has separate existence
+        "animism_attribution",     # Assigns lifelike qualities to abstract concepts
+        "centration_overcome",     # Can consider multiple aspects simultaneously
+    ],
+    "concrete_operational": [
+        "conservation",            # Understands quantity/meaning stays same across forms
+        "reversibility",           # Can logically reverse operations and arguments
+        "classification",          # Organizes knowledge into hierarchical categories
+        "seriation",               # Orders concepts along logical dimensions
+    ],
+    "formal_operational": [
+        "abstract_reasoning",      # Reasons about hypothetical/abstract concepts
+        "hypothetical_deductive",  # Forms and tests hypotheses about the world
+        "metacognition",           # Thinks about own thought processes and identity
+        "systematic_problem_solving",  # Approaches problems methodically
+    ],
+}
+
+
 class DevelopmentStage(BaseModel):
-    """Piaget-based cognitive development stage tracker."""
+    """Piaget-based cognitive development stage tracker.
+
+    The Being's cognitive_age only advances when developmental milestones
+    are achieved.  Stage transitions require ALL milestones of the current
+    stage to be completed before the Being can move to the next stage.
+
+    References:
+        - Piaget stages: https://www.simplypsychology.org/piaget.html
+        - Active Learning Machines: https://gregrobison.medium.com/active-learning-machines-what-thousand-brains-theory-and-piaget-reveal-about-true-intelligence-304b5c9aa82e
+    """
 
     stage: str = Field(
         default="sensorimotor",
@@ -176,13 +247,22 @@ class DevelopmentStage(BaseModel):
     cognitive_age: float = Field(
         default=0.0,
         ge=0.0,
-        description="Cognitive age in equivalent human-months of interaction",
+        description="Cognitive age in equivalent human-months.  Only advances when milestones are achieved.",
     )
     interaction_count: int = Field(
         default=0,
         ge=0,
         description="Total number of interactions since birth",
     )
+    milestones_achieved: list[str] = Field(
+        default_factory=list,
+        description="List of milestone identifiers that have been achieved (e.g. 'object_permanence')",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Composite personality state
+# ---------------------------------------------------------------------------
 
 
 class PersonalityState(BaseModel):
