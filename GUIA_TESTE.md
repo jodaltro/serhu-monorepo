@@ -3,8 +3,8 @@
 ## 📋 Pré-requisitos
 
 1. **Python 3.11+** instalado
-2. **Qdrant** (banco vetorial) - pode usar cloud ou local
-3. **Supabase** (banco relacional) - pode usar cloud grátis
+2. **Qdrant** (banco vetorial) - pode usar cloud ou local *(necessário apenas para testes de integração)*
+3. **Supabase** (banco relacional) - pode usar cloud grátis *(necessário apenas para testes de integração)*
 
 ---
 
@@ -17,7 +17,7 @@ cd packages/orchestrator
 pip install -e ".[dev]"
 ```
 
-### 2. Configurar variáveis de ambiente
+### 2. Configurar variáveis de ambiente (apenas para integração)
 
 Crie um arquivo `.env` na raiz do monorepo:
 
@@ -37,7 +37,7 @@ SUPABASE_URL=https://seu-projeto.supabase.co
 SUPABASE_KEY=sua-chave-supabase
 ```
 
-### 3. Configurar tabelas no Supabase
+### 3. Configurar tabelas no Supabase (apenas para integração)
 
 Acesse o SQL Editor no seu projeto Supabase e execute:
 
@@ -68,17 +68,18 @@ CREATE TABLE semantic_facts (
 
 ---
 
-## 📊 Estrutura dos Modelos de Personalidade
+## 📊 Estrutura dos Modelos de Personalidade (72 dimensões)
 
 ### HEXACO (24 facetas)
-Cada fator tem 4 facetas. Acesse assim:
+Cada fator tem 4 facetas. Tabula rasa: 0.5 (ponto neutro).
 - `personality.hexaco.sincerity`
 - `personality.hexaco.sociability`
 - `personality.hexaco.creativity`
 - etc.
 
 ### TCI-R Temperamento (16 subscales)
-**Não existem atributos agregados!** Use as subscales diretamente:
+**Não existem atributos agregados!** Use as subscales diretamente.
+Tabula rasa: 0.5 (ponto neutro).
 
 **Novelty Seeking (NS):**
 - `personality.tci_temperament.exploratory_excitability`
@@ -127,6 +128,7 @@ Caráter é **aprendido**, começa em 0.0:
 - `personality.tci_character.pure_conscience`
 
 ### Schwartz Values (19 valores)
+Tabula rasa: 0.0 (não formados). Valores representam o que o Ser *aspira*, não o que ele *é*.
 - `personality.schwartz.stimulation`
 - `personality.schwartz.achievement`
 - `personality.schwartz.benevolence_caring`
@@ -136,7 +138,7 @@ Caráter é **aprendido**, começa em 0.0:
 
 ## 🌍 Suporte a Múltiplos Idiomas
 
-O sistema agora suporta criação de Seres em **diferentes idiomas padrão**:
+O sistema suporta criação de Seres em **diferentes idiomas padrão**:
 - 🇬🇧 English (`en`) - Padrão
 - 🇧🇷 Português (`pt`)
 - 🇪🇸 Español (`es`)
@@ -163,14 +165,6 @@ prompt = build_system_prompt(orch.personality)
 # Prompt incluirá: "Você está navegando CONFIANÇA vs. DESCONFIANÇA..."
 ```
 
-### Exemplo Multilíngue
-
-Veja [exemplo_multilingue.py](exemplo_multilingue.py) para criar Seres em 4 idiomas:
-
-```bash
-python exemplo_multilingue.py
-```
-
 **Documentação completa**: [LANGUAGE_SUPPORT.md](LANGUAGE_SUPPORT.md)
 
 ---
@@ -184,11 +178,28 @@ Os testes unitários usam mocks, então rodam rápido e offline:
 ```bash
 # Da raiz do monorepo:
 python -m pytest packages/orchestrator/tests/unit -v
-
-# Ou de dentro do pacote:
-cd packages/orchestrator
-pytest tests/unit -v
 ```
+
+### Testes Ponta a Ponta Local (SEM precisar de Qdrant/Supabase)
+
+Os testes E2E locais exercitam o **ciclo de vida completo** do Orchestrator
+usando backends in-memory (sem Qdrant/Supabase reais):
+
+```bash
+# Da raiz do monorepo:
+python -m pytest packages/orchestrator/tests/e2e -v
+```
+
+O que é testado no E2E local:
+- ✅ Criação de Ser (tabula rasa)
+- ✅ Interações com evolução de traços
+- ✅ Overflow de memória de trabalho → archival
+- ✅ Consolidação (twilight)
+- ✅ Ciclo de sono (AIXI + SVD)
+- ✅ Progressão de milestones (Piaget completo)
+- ✅ Event Sourcing (replay de eventos)
+- ✅ Round-trip Protobuf (serialização/deserialização)
+- ✅ Geração de prompts em 4 idiomas (EN, PT, ES, FR)
 
 ### Testes de Integração (PRECISA das credenciais no .env)
 
@@ -197,10 +208,6 @@ Os testes de integração conectam nos serviços reais:
 ```bash
 # Da raiz do monorepo:
 python -m pytest packages/orchestrator/tests/integration -v -m integration
-
-# Ou de dentro do pacote:
-cd packages/orchestrator
-pytest tests/integration -v -m integration
 ```
 
 ### Todos os testes
@@ -225,6 +232,7 @@ orch = Orchestrator(
     supabase_url="https://seu-projeto.supabase.co",
     supabase_key="sua-chave",
     being_name="Lua",  # Nome do seu ser
+    language="pt",     # Idioma padrão
     working_memory_size=50,  # Tamanho da "RAM"
 )
 
@@ -247,51 +255,105 @@ for entry in context.working:
     print(f"  [{entry.role}] {entry.content}")
 
 # Ver fatos e episódios recuperados
-print(f"\nFatos semânticos: {len(context.facts)}")
-print(f"Episódios arquivados: {len(context.archival)}")
+print(f"\nFatos semânticos: {len(context.semantic_facts)}")
+print(f"Resultados archival: {len(context.archival_results)}")
 ```
 
 ### Exemplo 3: Atualizar Personalidade
 
 ```python
 # Aplicar mudanças de traços baseado na interação
-trait_updates = {
-    "hexaco.sociability": 0.1,  # Aumenta sociabilidade
-    "tci_temperament.exploratory_excitability": 0.05,  # Busca de novidade
-    "tci_temperament.impulsiveness": 0.03,
-    "schwartz.stimulation": 0.02,
-}
-
+# FORMATO: dict aninhado {modelo: {faceta: delta}}
 context = orch.process_message(
     role="user",
     content="Vamos explorar lugares novos!",
-    trait_deltas=trait_updates
+    trait_deltas={
+        "hexaco": {"sociability": 0.1, "inquisitiveness": 0.05},
+        "tci_temperament": {"exploratory_excitability": 0.05},
+        "schwartz": {"stimulation": 0.02},
+    },
 )
 
 # Ver nova personalidade
 print(f"Sociabilidade atual: {orch.personality.hexaco.sociability}")
 ```
 
-### Exemplo 4: Consolidar Memória (Twilight Phase)
+### Exemplo 4: Registrar Milestone (Piaget)
+
+```python
+# Registrar que o Ser alcançou um marco cognitivo
+engine = orch._personality_engine
+state = engine.record_milestone(orch.personality, "object_permanence")
+
+print(f"Estágio: {state.development.stage}")
+print(f"Idade cognitiva: {state.development.cognitive_age}")
+print(f"Milestones: {state.development.milestones_achieved}")
+```
+
+### Exemplo 5: Consolidar Memória (Twilight Phase)
 
 ```python
 # Consolidar working memory → archival
-summary = orch.consolidate()
-print(f"Consolidação: {summary}")
+archived = orch.consolidate()
+print(f"Entradas arquivadas: {archived}")
 ```
 
-### Exemplo 5: Ciclo de Sono (Dream Phase)
+### Exemplo 6: Ciclo de Sono (Dream Phase)
 
 ```python
 # Executar ciclo de sono (NREM + REM)
-sleep_result = orch.sleep()
+sleep_result = orch.sleep(num_rollouts=1000, svd_rank=8, seed=42)
 
 print(f"Fatos extraídos: {len(sleep_result.facts_extracted)}")
 print(f"Hipóteses geradas: {len(sleep_result.hypotheses)}")
 print(f"Novas crenças: {len(sleep_result.beliefs_added)}")
+print(f"Traits antes: {len(sleep_result.traits_before)} dims")
+print(f"Traits depois: {len(sleep_result.traits_after)} dims")
 ```
 
-### Exemplo 6: Carregar um Ser Existente
+### Exemplo 7: Event Sourcing
+
+```python
+from serhu_orchestrator.personality.event_store import EventStore
+
+# Criar event store para um Ser
+store = EventStore(ser_id=orch.being_id)
+
+# Registrar eventos
+store.record_being_created(name="Lua", language="pt")
+store.record_trait_update({"hexaco": {"sincerity": 0.1}})
+store.record_milestone("object_permanence", new_cognitive_age=6.0)
+store.record_belief("core", "O mundo é seguro.")
+
+# Reconstruir estado a partir dos eventos
+state = store.replay()
+print(f"Nome: {state.name}")
+print(f"Sinceridade: {state.hexaco.sincerity}")
+print(f"Idade cognitiva: {state.development.cognitive_age}")
+
+# Replay parcial (até evento 2)
+partial = store.replay(up_to_sequence=2)
+```
+
+### Exemplo 8: Serialização Protobuf
+
+```python
+from serhu_orchestrator.personality.proto_converter import (
+    personality_to_ledger,
+    ledger_to_personality,
+)
+
+# Converter para Protobuf (binário compacto)
+ledger = personality_to_ledger(orch.personality)
+binary = ledger.SerializeToString()
+print(f"Tamanho binário: {len(binary)} bytes")
+
+# Converter de volta para Pydantic
+restored = ledger_to_personality(ledger)
+assert restored.being_id == orch.personality.being_id
+```
+
+### Exemplo 9: Carregar um Ser Existente
 
 ```python
 # Se você já tem um Being criado
@@ -306,111 +368,34 @@ orch = Orchestrator(
 )
 
 print(f"Ser {orch.personality.name} carregado!")
+print(f"Idioma: {orch.personality.language}")
 print(f"Estágio cognitivo: {orch.personality.development.stage}")
+print(f"Conflito Erikson: {orch.personality.development.erikson_conflict}")
 print(f"Interações: {orch.personality.development.interaction_count}")
 ```
 
-### Exemplo 7: Obter System Prompt (para LLM)
+### Exemplo 10: Obter System Prompt (para LLM)
 
 ```python
-from serhu_orchestrator.personality.prompt_builder import build_system_prompt
-
 # Gerar prompt de sistema baseado na personalidade atual
-system_prompt = build_system_prompt(orch.personality)
+prompt = orch.build_prompt()
 
 print("=== SYSTEM PROMPT ===")
-print(system_prompt)
+print(prompt)
 
-# Agora você pode enviar esse prompt + contexto para um LLM (OpenAI, Claude, etc)
+# O prompt inclui:
+# - Tag de identidade (nome, idioma, estágio)
+# - Conflito Erikson no idioma do Ser
+# - 72 scores de personalidade (HEXACO, TCI-R, Schwartz)
+# - Restrições cognitivas (Piaget)
+# - Crenças (core + surface)
 ```
 
 ---
 
 ## 📝 Script de Exemplo Completo
 
-Crie um arquivo `exemplo_uso.py` na raiz do monorepo:
-
-```python
-"""Exemplo de uso completo do Orchestrator."""
-
-import os
-from dotenv import load_dotenv
-from serhu_orchestrator.orchestrator import Orchestrator
-from serhu_orchestrator.personality.prompt_builder import build_system_prompt
-
-load_dotenv()
-
-
-def main():
-    # 1. Criar ou carregar um Ser
-    print("🌟 Criando um novo Ser...")
-    
-    orch = Orchestrator(
-        qdrant_url=os.environ["QDRANT_URL"],
-        qdrant_api_key=os.environ["QDRANT_API_KEY"],
-        supabase_url=os.environ["SUPABASE_URL"],
-        supabase_key=os.environ["SUPABASE_KEY"],
-        being_name="Estrela",
-        working_memory_size=20,
-    )
-    
-    being_id = orch.being_id
-    print(f"✅ Ser criado! ID: {being_id}\n")
-
-    # 2. Interagir
-    print("💬 Conversando com o Ser...\n")
-    
-    messages = [
-        ("user", "Olá! Me fale sobre você."),
-        ("assistant", "Eu sou Estrela, um ser em desenvolvimento. Estou aprendendo sobre o mundo."),
-        ("user", "O que te deixa curioso?"),
-        ("assistant", "Estou curioso sobre as emoções humanas e como funcionam."),
-    ]
-    
-    for role, content in messages:
-        ctx = orch.process_message(role, content)
-        print(f"[{role}] {content}")
-    
-    print(f"\n📊 Working memory size: {len(ctx.working)}")
-
-    # 3. Ver personalidade
-    print("\n🎭 Estado da Personalidade:")
-    p = orch.personality
-    print(f"  - Estágio cognitivo: {p.development.stage}")
-    print(f"  - Interações: {p.development.interaction_count}")
-    print(f"  - Sociabilidade (HEXACO): {p.hexaco.sociability:.2f}")
-    print(f"  - Excitabilidade Exploratória (TCI): {p.tci_temperament.exploratory_excitability:.2f}")
-    print(f"  - Empatia (Caráter TCI): {p.tci_character.empathy:.2f}")
-
-    # 4. Consolidar memória
-    print("\n🌙 Consolidando memória (twilight)...")
-    summary = orch.consolidate()
-    print(f"  {summary}")
-
-    # 5. Ciclo de sono
-    print("\n😴 Executando ciclo de sono...")
-    sleep_result = orch.sleep()
-    print(f"  Fatos extraídos: {len(sleep_result.facts_extracted)}")
-    print(f"  Hipóteses geradas: {len(sleep_result.hypotheses)}")
-    print(f"  Novas crenças: {len(sleep_result.beliefs_added)}")
-    print(f"  Traits antes: {len(sleep_result.traits_before)} dims")
-    print(f"  Traits depois: {len(sleep_result.traits_after)} dims")
-
-    # 6. Gerar system prompt
-    print("\n📜 System Prompt gerado:")
-    print("=" * 60)
-    prompt = build_system_prompt(p)
-    print(prompt[:500] + "...")  # Primeiros 500 chars
-    print("=" * 60)
-
-    print(f"\n✨ Exemplo concluído! Being ID para reusar: {being_id}")
-
-
-if __name__ == "__main__":
-    main()
-```
-
-Execute:
+Execute o exemplo incluído na raiz do monorepo:
 
 ```bash
 python exemplo_uso.py
@@ -443,16 +428,11 @@ pip install -e ".[dev]"
 
 ### Testes pulando (SKIPPED)
 
-Se os testes de integração forem pulados, é porque as variáveis de ambiente não estão configuradas ou os serviços não estão acessíveis.
+Se os testes de integração forem pulados, é porque as variáveis de ambiente não estão configuradas ou os serviços não estão acessíveis. Use os **testes E2E locais** como alternativa:
 
----
-
-## 📚 Próximos Passos
-
-1. **Conectar com um LLM**: Use o `build_system_prompt()` + contexto para enviar para OpenAI/Anthropic
-2. **Interface Web**: Crie um frontend que chame o Orchestrator
-3. **Visualização 3D**: Use os dados de personalidade para gerar a forma visual do Ser
-4. **Evolução Contínua**: Implemente lógica para atualizar traços baseado nas interações
+```bash
+python -m pytest packages/orchestrator/tests/e2e -v
+```
 
 ---
 
@@ -462,7 +442,12 @@ Se os testes de integração forem pulados, é porque as variáveis de ambiente 
 - **Archival Memory**: Memória de longo prazo vetorial (Qdrant)
 - **Relational Memory**: Memória estruturada (Supabase) - personalidade, episódios, fatos
 - **Consolidation**: Transferir working → archival
-- **Sleep Cycle**: "Sonhar" para consolidar memórias e evoluir
+- **Sleep Cycle**: "Sonhar" para consolidar memórias e evoluir (AIXI + SVD)
 - **Tabula Rasa**: O Ser começa "em branco" e aprende com o usuário
+- **Milestones**: Marcos cognitivos que avançam a idade (Piaget)
+- **Erikson Conflicts**: Desafios psicossociais mapeados ao estágio atual
+- **Event Sourcing**: Log imutável de todos os eventos da vida do Ser
+- **Protobuf**: Serialização binária para comunicação entre serviços (gRPC)
+- **i18n**: Suporte multilíngue (EN, PT, ES, FR)
 
 Bora testar! 🚀

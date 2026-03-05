@@ -88,17 +88,27 @@ assert orch2.personality.language == "pt"  # ✅ Mesmo idioma!
 
 ## Exemplo Prático: Múltiplos Seres
 
-Veja [exemplo_multilingue.py](exemplo_multilingue.py) para criar Seres em múltiplos idiomas:
+Os testes E2E locais validam a geração de prompts em todos os 4 idiomas:
 
 ```bash
-python exemplo_multilingue.py
+python -m pytest packages/orchestrator/tests/e2e/test_local_e2e.py::TestLocalE2EPromptLanguages -v
 ```
 
-Isso criará:
-- `Luna` em English
-- `Estrela` em Portuguese
-- `Sirius` em Spanish
-- `Lua` em French
+Para criar Seres em múltiplos idiomas via código:
+
+```python
+from serhu_orchestrator.orchestrator import Orchestrator
+
+languages = {"en": "Luna", "pt": "Estrela", "es": "Sirius", "fr": "Lua"}
+for lang, name in languages.items():
+    orch = Orchestrator(
+        qdrant_url="...", qdrant_api_key="...",
+        supabase_url="...", supabase_key="...",
+        being_name=name, language=lang,
+    )
+    prompt = orch.build_prompt()
+    print(f"[{lang}] {name}: {prompt[:80]}...")
+```
 
 ## Como Funciona Internamente
 
@@ -229,5 +239,5 @@ Testes cobertos:
 ## 📚 Referências
 
 - [Arquivo i18n.py](packages/orchestrator/src/serhu_orchestrator/personality/i18n.py) - Todas as traduções
-- [Teste de Language Support](packages/orchestrator/tests/unit/test_language_support.py) - Validação
-- [Exemplo Multilíngue](exemplo_multilingue.py) - Demonstração prática
+- [Teste de Language Support](packages/orchestrator/tests/unit/test_language_support.py) - Validação unitária
+- [Testes E2E Multilíngue](packages/orchestrator/tests/e2e/test_local_e2e.py) - Validação ponta a ponta

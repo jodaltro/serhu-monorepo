@@ -9,5 +9,6 @@ testpaths = ["packages/orchestrator/tests"]
 markers = [
     "integration: marks tests that require external services (Qdrant, Supabase)",
     "unit: marks unit tests",
+    "e2e: marks local end-to-end tests (no external services needed)",
 ]
 asyncio_mode = "auto"
