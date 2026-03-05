@@ -15,6 +15,10 @@ the Orchestrator can:
 - Automatically extract trait deltas from conversations.
 - Enhance sleep-cycle semantization and belief derivation.
 
+Without an LLM client, only ``process_message()`` is available for
+wakefulness interactions, and the sleep cycle falls back to rule-based
+semantization and belief extraction.
+
 References:
     - MemGPT: https://informationmatters.org/2025/10/memgpt-engineering-semantic-memory/
     - Piaget in AI: https://gregrobison.medium.com/active-learning-machines-...

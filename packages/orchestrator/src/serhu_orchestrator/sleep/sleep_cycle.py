@@ -215,8 +215,8 @@ class SleepCycle:
         """
         if self._llm is not None:
             try:
-                hypothesis_texts = [h.action for h in hypotheses[:10] if h.reward > 0.0]
-                if hypothesis_texts:
+                if any(h.reward > 0.0 for h in hypotheses[:10]):
+                    hypothesis_texts = [h.action for h in hypotheses[:10] if h.reward > 0.0]
                     personality_summary = self._build_personality_summary(state)
                     return self._llm.derive_beliefs(hypothesis_texts, personality_summary)
             except Exception:
