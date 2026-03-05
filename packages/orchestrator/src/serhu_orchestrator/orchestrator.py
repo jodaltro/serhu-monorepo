@@ -6,12 +6,14 @@ together, implementing the MemGPT-like "operating system" for the Being's mind.
 Lifecycle phases:
     1. **Wakefulness** – Active interaction via ``process_message()``.
     2. **Twilight**    – Consolidation via ``consolidate()``.
-    3. **Sleep NREM**  – (future) SVD rank-reduction / dream pruning.
-    4. **Sleep REM**   – (future) AIXI hypothesis generation.
+    3. **Sleep NREM**  – SVD rank-reduction / dream pruning via ``sleep()``.
+    4. **Sleep REM**   – AIXI hypothesis generation via ``sleep()``.
 
 References:
     - MemGPT: https://informationmatters.org/2025/10/memgpt-engineering-semantic-memory/
     - Piaget in AI: https://gregrobison.medium.com/active-learning-machines-...
+    - AIXI: https://www.alignmentforum.org/w/aixi
+    - Dream Pruning: https://pub.towardsai.net/dream-pruning-what-happens-when-ai-models-sleep-3db3c404e24a
 """
 
 from __future__ import annotations
@@ -21,7 +23,10 @@ from serhu_orchestrator.memory.archival_memory import ArchivalMemory
 from serhu_orchestrator.memory.relational_memory import RelationalMemory
 from serhu_orchestrator.memory.memory_manager import MemoryManager, ContextWindow
 from serhu_orchestrator.personality.personality_engine import PersonalityEngine
+from serhu_orchestrator.personality.prompt_builder import build_system_prompt
 from serhu_orchestrator.personality.types import PersonalityState
+from serhu_orchestrator.sleep.dream_engine import DreamEngine
+from serhu_orchestrator.sleep.sleep_cycle import SleepCycle, SleepResult
 
 
 class Orchestrator:
@@ -196,6 +201,71 @@ class Orchestrator:
             The stored fact row.
         """
         return self._memory_manager.store_semantic_fact(fact)
+
+    # -- sleep phase ---------------------------------------------------------
+
+    def sleep(
+        self,
+        *,
+        num_rollouts: int = 1000,
+        svd_rank: int = 8,
+        seed: int | None = None,
+    ) -> SleepResult:
+        """Execute the full sleep cycle (NREM + REM).
+
+        Orchestrates:
+        1. Retrieve recent episodes from relational memory.
+        2. Run the SleepCycle: semantization → AIXI dreams → SVD consolidation.
+        3. Store extracted facts and persist the updated personality.
+
+        Parameters
+        ----------
+        num_rollouts : int
+            Number of AIXI dream rollouts.
+        svd_rank : int
+            Target rank for SVD dream pruning.
+        seed : int | None
+            Random seed for reproducible dreams.
+
+        Returns
+        -------
+        SleepResult
+            Metadata about the sleep cycle.
+        """
+        # Retrieve recent episodes
+        episodes = self._relational.get_episodes(self._personality.being_id, limit=100)
+
+        # Run the sleep cycle
+        dream_engine = DreamEngine(seed=seed)
+        cycle = SleepCycle(dream_engine=dream_engine)
+        self._personality, result = cycle.run(
+            self._personality,
+            episodes,
+            num_rollouts=num_rollouts,
+            svd_rank=svd_rank,
+        )
+
+        # Store extracted facts in relational memory
+        for fact in result.facts_extracted:
+            self._memory_manager.store_semantic_fact(fact)
+
+        # Persist the updated personality
+        self._personality_engine._persist(self._personality)
+
+        return result
+
+    # -- prompt building -----------------------------------------------------
+
+    def build_prompt(self) -> str:
+        """Build a structured system prompt from the current personality ledger.
+
+        Returns
+        -------
+        str
+            A system prompt with persona tags, cognitive constraints,
+            and Erikson conflict framing for LLM consumption.
+        """
+        return build_system_prompt(self._personality)
 
     # -- cleanup (for testing) -----------------------------------------------
 
