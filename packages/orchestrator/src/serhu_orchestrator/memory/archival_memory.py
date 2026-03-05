@@ -168,5 +168,5 @@ class ArchivalMemory:
         Qdrant accepts UUID strings as point ids. We hash the entry_id
         to produce a valid UUID-formatted identifier.
         """
-        h = hashlib.md5(entry_id.encode()).hexdigest()  # noqa: S324
-        return f"{h[:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}-{h[20:]}"
+        h = hashlib.sha256(entry_id.encode()).hexdigest()
+        return f"{h[:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}-{h[20:32]}"

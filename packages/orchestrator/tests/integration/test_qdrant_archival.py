@@ -107,7 +107,7 @@ class TestArchivalMemoryQdrant:
         )
         assert all(r["memory_type"] == "semantic" for r in results)
 
-    def test_delete_collection(self):
+    def test_delete_collection(self, qdrant_url: str, qdrant_api_key: str):
         """Deleting the collection removes all data."""
         entry = ArchivalEntry(
             content="Temporary data",
@@ -119,8 +119,8 @@ class TestArchivalMemoryQdrant:
         self.archival.delete_collection()
         # Re-creating should start empty
         self.archival = ArchivalMemory(
-            url=self.archival._client._client.rest_uri,
-            api_key=self.archival._client._client.rest_uri,
+            url=qdrant_url,
+            api_key=qdrant_api_key,
             collection_name=self.collection,
             vector_size=384,
         )
