@@ -26,17 +26,17 @@ option java_multiple_files = true;
 
 // A single HEXACO facet score (0.0 – 1.0).
 message HexacoFacet {
-  float score = 1; // 0.0 a 1.0
+  float score = 1; // 0.0 to 1.0
 }
 
 // A single TCI-R subscale score (0.0 – 1.0).
 message TciSubscale {
-  float score = 1; // 0.0 a 1.0
+  float score = 1; // 0.0 to 1.0
 }
 
 // A single Schwartz refined value score (0.0 – 1.0).
 message SchwartzValue {
-  float score = 1; // 0.0 a 1.0
+  float score = 1; // 0.0 to 1.0
 }
 
 // ---------------------------------------------------------------------------
