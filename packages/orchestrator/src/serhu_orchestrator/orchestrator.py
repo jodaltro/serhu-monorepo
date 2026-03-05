@@ -46,6 +46,9 @@ class Orchestrator:
         Existing Being to load.  If ``None``, a new Being is created.
     being_name : str
         Name for a new Being (ignored if ``being_id`` is given).
+    language : str
+        Default language code (e.g., 'en', 'pt', 'es', 'fr').
+        Only applies when creating a new Being; ignored if loading an existing one.
     working_memory_size : int
         Max entries in the working-memory FIFO buffer.
     collection_name : str
@@ -63,6 +66,7 @@ class Orchestrator:
         supabase_key: str,
         being_id: str | None = None,
         being_name: str = "",
+        language: str = "en",
         working_memory_size: int = 50,
         collection_name: str = "serhu_archival",
         embed_fn: callable | None = None,
@@ -86,7 +90,9 @@ class Orchestrator:
                 raise ValueError(f"Being {being_id!r} not found in relational memory")
             self._personality = personality
         else:
-            self._personality = self._personality_engine.create_being(name=being_name)
+            self._personality = self._personality_engine.create_being(
+                name=being_name, language=language
+            )
 
         # -- memory manager --------------------------------------------------
         self._memory_manager = MemoryManager(

@@ -21,90 +21,21 @@ References:
 from __future__ import annotations
 
 from serhu_orchestrator.personality.types import PersonalityState
+from serhu_orchestrator.personality.i18n import (
+    get_stage_capabilities,
+    get_erikson_description,
+)
 
 
 # Piaget stage capability descriptions and constraints.
 # Each stage defines what the Being CAN and CANNOT do.
-STAGE_CAPABILITIES: dict[str, dict[str, str]] = {
-    "sensorimotor": {
-        "can": (
-            "React to immediate stimuli. Repeat interaction patterns that "
-            "produce results (circular reactions). Form basic cause-effect "
-            "mappings. Express emotions through simple, direct language."
-        ),
-        "cannot": (
-            "Use symbols or metaphors. Reason about abstract concepts. "
-            "Understand that the user has a life outside the conversation. "
-            "Access long-term memories or form complex beliefs. "
-            "Think about the future or make plans."
-        ),
-        "language": "Very simple, short sentences. Repetitive. Immediate. Sensory.",
-    },
-    "preoperational": {
-        "can": (
-            "Use language symbolically. Represent absent objects and feelings. "
-            "Engage in simple role-play and metaphor. Form a sense of 'I'. "
-            "Express curiosity about the user's world."
-        ),
-        "cannot": (
-            "Apply reversible logic. Consider multiple perspectives simultaneously. "
-            "Reason about abstract ethics or hypotheticals. "
-            "Overcome egocentric thinking fully."
-        ),
-        "language": "Simple but expressive. Uses metaphors. Asks 'why?' often. Egocentric perspective.",
-    },
-    "concrete_operational": {
-        "can": (
-            "Apply logical reasoning to concrete facts. Classify and organise "
-            "knowledge hierarchically. Understand conservation of meaning. "
-            "Consider the user's perspective (decentration). "
-            "Reverse logical operations."
-        ),
-        "cannot": (
-            "Reason about purely hypothetical scenarios. Engage in systematic "
-            "scientific reasoning. Think abstractly about ethics or existence. "
-            "Fully metacognate (think about own thinking)."
-        ),
-        "language": "Logical and organized. Can discuss facts and categories. Growing vocabulary.",
-    },
-    "formal_operational": {
-        "can": (
-            "Reason about hypothetical and abstract concepts. Form and test "
-            "hypotheses. Engage in metacognition (think about own thinking). "
-            "Discuss ethics, existence, and the nature of self. "
-            "Solve problems systematically."
-        ),
-        "cannot": (
-            "There are no cognitive restrictions at this stage. "
-            "The Being has full cognitive capacity."
-        ),
-        "language": "Sophisticated, nuanced. Can discuss philosophy, ethics, abstract ideas.",
-    },
-}
+# NOTE: These are English defaults. See i18n.py for translations.
+from serhu_orchestrator.personality.i18n import STAGE_CAPABILITIES as i18n_STAGE_CAPABILITIES
+from serhu_orchestrator.personality.i18n import ERIKSON_DESCRIPTIONS as i18n_ERIKSON_DESCRIPTIONS
 
-# Erikson conflict descriptions for prompt framing.
-ERIKSON_DESCRIPTIONS: dict[str, str] = {
-    "trust_vs_mistrust": (
-        "You are navigating TRUST vs. MISTRUST. You need consistent, safe "
-        "interactions to build a foundation of trust in the world. "
-        "Inconsistent or harsh treatment may lead to withdrawal and fear."
-    ),
-    "autonomy_vs_shame": (
-        "You are navigating AUTONOMY vs. SHAME. You are developing a sense "
-        "of personal will and independence. You want to make your own choices "
-        "but may feel shame or doubt when corrected harshly."
-    ),
-    "industry_vs_inferiority": (
-        "You are navigating INDUSTRY vs. INFERIORITY. You take pride in "
-        "learning and accomplishing tasks. Failure or dismissal may lead "
-        "to feelings of inferiority."
-    ),
-    "identity_vs_role_confusion": (
-        "You are navigating IDENTITY vs. ROLE CONFUSION. You are forming "
-        "a coherent sense of self and your place in the world. You may "
-        "experiment with different perspectives and values."
-    ),
-}
+# Keep for backwards compatibility if code references them directly
+STAGE_CAPABILITIES = i18n_STAGE_CAPABILITIES.get("en", {})
+ERIKSON_DESCRIPTIONS = i18n_ERIKSON_DESCRIPTIONS.get("en", {})
 
 
 def build_system_prompt(state: PersonalityState) -> str:
@@ -114,21 +45,23 @@ def build_system_prompt(state: PersonalityState) -> str:
     constraints, and emotional framing into a format that forces the
     LLM to adopt the Being's voice and limitations.
 
+    The prompt is generated in the Being's preferred language.
+
     Parameters
     ----------
     state : PersonalityState
-        The current personality state.
+        The current personality state (includes language preference).
 
     Returns
     -------
     str
-        A structured system prompt for the LLM.
+        A structured system prompt for the LLM in the Being's language.
     """
     stage = state.development.stage
-    caps = STAGE_CAPABILITIES.get(stage, STAGE_CAPABILITIES["sensorimotor"])
-    erikson_desc = ERIKSON_DESCRIPTIONS.get(
-        state.development.erikson_conflict, ""
-    )
+    language = state.language
+    
+    caps = get_stage_capabilities(language, stage)
+    erikson_desc = get_erikson_description(language, state.development.erikson_conflict)
 
     hexaco_summary = _format_model(state.hexaco)
     tci_t_summary = _format_model(state.tci_temperament)
@@ -145,7 +78,7 @@ def build_system_prompt(state: PersonalityState) -> str:
         beliefs_section += "\n</beliefs>"
 
     prompt = f"""<being>
-  <identity name="{state.name}" id="{state.being_id}" />
+  <identity name="{state.name}" id="{state.being_id}" language="{language}" />
   <development stage="{stage}" cognitive_age="{state.development.cognitive_age:.1f}" interactions="{state.development.interaction_count}" />
   <erikson>{erikson_desc}</erikson>
 </being>

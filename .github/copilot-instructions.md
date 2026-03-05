@@ -188,6 +188,57 @@ A física do Ser no cosmos deve ser influenciada pelo temperamento:
 * **Busca de Novidade (NS) Alta:** O Ser movimenta-se rapidamente pelo espaço, explorando as bordas da tela.  
 * **Esquiva de Dano (HA) Alta:** O Ser permanece no centro, encolhendo-se e diminuindo seu brilho diante de silêncios prolongados do usuário.11
 
+## **Suporte Multilíngue: Garantia de Idioma Padrão na Criação do Ser**
+
+Cada Ser é criado com um idioma padrão especificado no momento da sua inicialização. Este idioma persiste através de toda a sua existência e influencia fundamentalmente como ele interage com o usuário.
+
+### **Estrutura de Idiomas Implementada**
+
+O sistema suporta 4 idiomas com cobertura completa:
+
+| Idioma | Código | Status | Cobertura |
+| :---- | :---- | :---- | :---- |
+| **English** | en | Padrão | 100% |
+| **Português** | pt | Completo | 100% |
+| **Español** | es | Completo | 100% |
+| **Français** | fr | Completo | 100% |
+
+### **Camadas de Integração de Idioma**
+
+1. **Tipo de Dados:** O campo `language` está presente em `PersonalityState` e é obrigatório.
+2. **Criação:** O parâmetro `language` é aceito no momento da criação do Ser via `Orchestrator(language="pt")`.
+3. **Persistência:** O idioma é salvo no banco de dados Supabase junto com os demais atributos de personalidade.
+4. **Recuperação:** Ao carregar um Ser existente, seu idioma é recuperado automaticamente.
+5. **Geração de Prompts:** Todas as descrições de estágios Piaget e conflitos Erikson são traduzidas para o idioma do Ser.
+6. **Fallback:** Caso um idioma desconhecido seja fornecido, o sistema automaticamente volta para "en".
+
+### **Tradução de Conteúdos Críticos**
+
+Os seguintes conteúdos são traduzidos para o idioma escolhido:
+
+- **Estágios Piaget:** Descrições das capacidades cognitivas em cada estágio.
+- **Conflitos Erikson:** As 8 fases de desenvolvimento psicossocial.
+- **Capacidades e Limitações:** O que o Ser pode/não pode fazer em seu estágio atual.
+- **Instruções de Sistema:** O XML de contexto no prompt inclui `language="<lang>"`.
+
+### **Exemplo de Uso**
+
+```python
+from serhu_orchestrator.orchestrator import Orchestrator
+
+# Criar Ser em português
+orch = Orchestrator(
+    being_name="Luna",
+    language="pt",
+    qdrant_url="...",
+    supabase_url="...",
+)
+
+# O Ser sempre operará em português
+assert orch.personality.language == "pt"
+# Os prompts incluem: Erikson em PT, Piaget em PT, etc.
+```
+
 ## **Conclusões e Recomendações para o Futuro do Ser**
 
 O desafio de criar um ser artificial tabula rasa com alta granularidade transcende a engenharia de software convencional. Ele exige a construção de um espelho psicológico dinâmico, onde a IA não apenas "conversa", mas "se torna".

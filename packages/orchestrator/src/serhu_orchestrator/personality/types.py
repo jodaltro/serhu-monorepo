@@ -297,6 +297,10 @@ class PersonalityState(BaseModel):
 
     being_id: str = Field(description="Unique identifier for this Being")
     name: str = Field(default="", description="Name given by the user")
+    language: str = Field(
+        default="en",
+        description="Default language code (e.g., 'en', 'pt', 'es', 'fr'). Used for system prompts and responses.",
+    )
     development: DevelopmentStage = Field(default_factory=DevelopmentStage)
     hexaco: HexacoFacets = Field(default_factory=HexacoFacets)
     tci_temperament: TciTemperament = Field(default_factory=TciTemperament)

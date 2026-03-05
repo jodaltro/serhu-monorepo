@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
     Distance,
+    KeywordIndexParams,
     PointStruct,
     VectorParams,
 )
@@ -79,6 +80,12 @@ class ArchivalMemory:
                     size=self.vector_size,
                     distance=Distance.COSINE,
                 ),
+            )
+            # Create index for memory_type field to enable filtering
+            self._client.create_payload_index(
+                collection_name=self.collection_name,
+                field_name="memory_type",
+                field_schema=KeywordIndexParams(type="keyword"),
             )
 
     # -- public API ----------------------------------------------------------

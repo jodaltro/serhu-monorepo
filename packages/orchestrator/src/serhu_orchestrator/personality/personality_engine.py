@@ -43,7 +43,7 @@ class PersonalityEngine:
 
     # -- lifecycle -----------------------------------------------------------
 
-    def create_being(self, name: str = "") -> PersonalityState:
+    def create_being(self, name: str = "", language: str = "en") -> PersonalityState:
         """Create a new Being as a *tabula rasa*.
 
         - HEXACO facets start at 0.5 (neutral midpoint)
@@ -51,6 +51,13 @@ class PersonalityEngine:
         - TCI-R character starts at 0.0 (must be built)
         - Schwartz values start at 0.0 (unformed)
         - Development stage: sensorimotor, age 0, no milestones
+
+        Parameters
+        ----------
+        name : str
+            Name for the new Being.
+        language : str
+            Default language code (e.g., 'en', 'pt', 'es', 'fr').
 
         Returns
         -------
@@ -61,6 +68,7 @@ class PersonalityEngine:
         state = PersonalityState(
             being_id=being_id,
             name=name,
+            language=language,
             development=DevelopmentStage(),
             hexaco=HexacoFacets(),
             tci_temperament=TciTemperament(),
