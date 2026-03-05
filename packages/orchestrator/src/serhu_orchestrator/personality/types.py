@@ -196,7 +196,7 @@ STAGE_AGE_RANGES: dict[str, tuple[float, float]] = {
 #
 # References:
 #   - Sensorimotor milestones: https://www.simplypsychology.org/piaget.html
-#   - Piaget's stages applied to AI: https://gregrobison.medium.com/active-learning-machines-...
+#   - Piaget's stages applied to AI: https://gregrobison.medium.com/active-learning-machines-what-thousand-brains-theory-and-piaget-reveal-about-true-intelligence-304b5c9aa82e
 #   - Preoperational / Concrete / Formal milestones:
 #     https://mxtsch.people.wm.edu/Teaching/JCPE/Volume1/JCPE_2008-01-09.pdf
 
@@ -237,7 +237,7 @@ class DevelopmentStage(BaseModel):
 
     References:
         - Piaget stages: https://www.simplypsychology.org/piaget.html
-        - Active Learning Machines: https://gregrobison.medium.com/active-learning-machines-...
+        - Active Learning Machines: https://gregrobison.medium.com/active-learning-machines-what-thousand-brains-theory-and-piaget-reveal-about-true-intelligence-304b5c9aa82e
     """
 
     stage: str = Field(
