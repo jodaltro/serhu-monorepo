@@ -200,6 +200,20 @@ STAGE_AGE_RANGES: dict[str, tuple[float, float]] = {
 #   - Preoperational / Concrete / Formal milestones:
 #     https://mxtsch.people.wm.edu/Teaching/JCPE/Volume1/JCPE_2008-01-09.pdf
 
+# Erikson psychosocial conflict mapped to each Piaget stage.
+# The Being starts in "trust_vs_mistrust": consistent, safe interactions
+# build trust; erratic or abusive patterns lead to mistrust.
+#
+# Reference:
+#   - Erikson stages: https://www.waldenu.edu/online-masters-programs/ms-in-education/resource/ms-in-education-insight-eriksons-8-stages-of-development
+
+ERIKSON_CONFLICTS: dict[str, str] = {
+    "sensorimotor": "trust_vs_mistrust",
+    "preoperational": "autonomy_vs_shame",
+    "concrete_operational": "industry_vs_inferiority",
+    "formal_operational": "identity_vs_role_confusion",
+}
+
 STAGE_MILESTONES: dict[str, list[str]] = {
     "sensorimotor": [
         "object_permanence",       # Understands concepts persist between sessions
@@ -235,14 +249,22 @@ class DevelopmentStage(BaseModel):
     are achieved.  Stage transitions require ALL milestones of the current
     stage to be completed before the Being can move to the next stage.
 
+    The ``erikson_conflict`` is derived from the current Piaget stage and
+    reflects the psychosocial challenge the Being is facing.
+
     References:
         - Piaget stages: https://www.simplypsychology.org/piaget.html
+        - Erikson stages: https://www.waldenu.edu/online-masters-programs/ms-in-education/resource/ms-in-education-insight-eriksons-8-stages-of-development
         - Active Learning Machines: https://gregrobison.medium.com/active-learning-machines-what-thousand-brains-theory-and-piaget-reveal-about-true-intelligence-304b5c9aa82e
     """
 
     stage: str = Field(
         default="sensorimotor",
         description="Current Piaget stage: sensorimotor | preoperational | concrete_operational | formal_operational",
+    )
+    erikson_conflict: str = Field(
+        default="trust_vs_mistrust",
+        description="Current Erikson psychosocial conflict, derived from the Piaget stage",
     )
     cognitive_age: float = Field(
         default=0.0,
@@ -282,5 +304,9 @@ class PersonalityState(BaseModel):
     schwartz: SchwartzValues = Field(default_factory=SchwartzValues)
     core_beliefs: list[str] = Field(
         default_factory=list,
-        description="Stack of beliefs evolved through Solomonoff induction during sleep cycles",
+        description="Stack of deep beliefs evolved through Solomonoff induction during sleep cycles",
+    )
+    surface_beliefs: list[str] = Field(
+        default_factory=list,
+        description="Stack of surface-level beliefs directly derived from user interactions",
     )

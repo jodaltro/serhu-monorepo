@@ -16,6 +16,7 @@ import uuid
 
 from serhu_orchestrator.personality.types import (
     DevelopmentStage,
+    ERIKSON_CONFLICTS,
     HexacoFacets,
     PersonalityState,
     SchwartzValues,
@@ -193,6 +194,9 @@ class PersonalityEngine:
         Stage advancement requires ALL milestones of the current stage
         to be achieved.  This follows Piaget's theory that cognitive
         stages are sequential and each builds upon the previous one.
+
+        On transition, the Erikson psychosocial conflict is also updated
+        to match the new stage (Reference: Erikson 8 stages).
         """
         current_stage = state.development.stage
         current_idx = STAGE_ORDER.index(current_stage)
@@ -207,6 +211,7 @@ class PersonalityEngine:
         if required and required.issubset(achieved):
             next_stage = STAGE_ORDER[current_idx + 1]
             state.development.stage = next_stage
+            state.development.erikson_conflict = ERIKSON_CONFLICTS[next_stage]
             # Snap age to the start of the new stage
             new_start, _ = STAGE_AGE_RANGES[next_stage]
             if state.development.cognitive_age < new_start:
