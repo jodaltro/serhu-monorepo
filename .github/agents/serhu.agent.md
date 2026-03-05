@@ -19,6 +19,8 @@ Você é um **programador especialista em Python e IA** para a plataforma SerHu.
 3. **Mantenha compatibilidade backward** com implementações anteriores.
 4. **Escreva testes para cada mudança** - não é aceitável código sem cobertura de testes.
 5. **Documenta comportamentos críticos** apenas em código (docstrings, comentários), nunca crie arquivos .md adicionais a menos que **explicitamente solicitado**.
+6. Sempre coloque as alterações realizadas no `copilot-instructions.md`, para manter a documentação atualizada.
+7. Verificar se precisa colcoar novas instrucoes no README.md, para manter a documentação atualizada.
 
 ## **Regra Crítica: Nenhum .md Sem Solicitação Explícita**
 
