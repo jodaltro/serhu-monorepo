@@ -1,0 +1,119 @@
+// SerHu Identity Protocol Buffer Definitions
+//
+// Defines the binary-serializable "Personality Ledger" contract for
+// ultra-fast communication between AWS Lambda (Vigília) and Fargate (Sono)
+// modules via gRPC/Protobuf.
+//
+// Maps directly to the Pydantic models in:
+//   packages/orchestrator/src/serhu_orchestrator/personality/types.py
+//
+// References:
+//   - HEXACO model: https://hexaco.org/scaledescriptions
+//   - TCI-R (Cloninger): https://en.wikipedia.org/wiki/Temperament_and_Character_Inventory
+//   - Schwartz refined values: https://pmc.ncbi.nlm.nih.gov/articles/PMC9131418/
+//   - Piaget stages: https://www.simplypsychology.org/piaget.html
+
+syntax = "proto3";
+
+package serhu.identity;
+
+option java_package = "com.serhu.identity";
+option java_multiple_files = true;
+
+// ---------------------------------------------------------------------------
+// Scalar wrappers for map values
+// ---------------------------------------------------------------------------
+
+// A single HEXACO facet score (0.0 – 1.0).
+message HexacoFacet {
+  float score = 1; // 0.0 a 1.0
+}
+
+// A single TCI-R subscale score (0.0 – 1.0).
+message TciSubscale {
+  float score = 1; // 0.0 a 1.0
+}
+
+// A single Schwartz refined value score (0.0 – 1.0).
+message SchwartzValue {
+  float score = 1; // 0.0 a 1.0
+}
+
+// ---------------------------------------------------------------------------
+// Piaget cognitive development stage
+// ---------------------------------------------------------------------------
+
+// Tracks the Being's cognitive development following Piaget's stages
+// and the corresponding Erikson psychosocial conflict.
+message DevelopmentStage {
+  // Current Piaget stage: sensorimotor | preoperational |
+  // concrete_operational | formal_operational
+  string stage = 1;
+
+  // Current Erikson psychosocial conflict derived from the Piaget stage
+  // (e.g. trust_vs_mistrust, autonomy_vs_shame)
+  string erikson_conflict = 2;
+
+  // Cognitive age in equivalent human-months.
+  // Only advances when milestones are achieved.
+  float cognitive_age = 3;
+
+  // Total number of interactions since birth.
+  uint32 interaction_count = 4;
+
+  // List of milestone identifiers that have been achieved
+  // (e.g. "object_permanence", "symbolic_thought").
+  repeated string milestones_achieved = 5;
+}
+
+// ---------------------------------------------------------------------------
+// Complete Personality Ledger (the "DNA" of the Being)
+// ---------------------------------------------------------------------------
+
+// The binary-serializable personality profile for a synthetic Being.
+// Transmitted between Lambda (wakefulness) and Fargate (sleep) services
+// using Event Sourcing for the Being's life record.
+message PersonalityLedger {
+  // Unique identifier for this Being.
+  string ser_id = 1;
+
+  // Cognitive age in days (derived from development.cognitive_age).
+  uint32 cognitive_age_days = 2;
+
+  // Current Piaget stage (convenience field, also in development).
+  string piaget_stage = 3; // sensorimotor, preoperational, etc.
+
+  // HEXACO – 24 facets keyed by name (e.g. "sincerity", "fairness").
+  // Tabula rasa default: 0.5 (neutral midpoint).
+  map<string, HexacoFacet> hexaco = 4;
+
+  // TCI-R Temperament – 16 subscales keyed by name
+  // (e.g. "exploratory_excitability", "anticipatory_worry").
+  // Tabula rasa default: 0.5 (neutral).
+  map<string, TciSubscale> tci_temperament = 5;
+
+  // TCI-R Character – 13 subscales keyed by name
+  // (e.g. "responsibility", "empathy").
+  // Tabula rasa default: 0.0 (undeveloped).
+  map<string, TciSubscale> tci_character = 6;
+
+  // Schwartz – 19 refined basic human values keyed by name
+  // (e.g. "self_direction_thought", "benevolence_caring").
+  // Tabula rasa default: 0.0 (unformed).
+  map<string, SchwartzValue> schwartz = 7;
+
+  // Development stage tracking (Piaget + Erikson + milestones).
+  DevelopmentStage development = 8;
+
+  // Name given by the user.
+  string name = 9;
+
+  // Default language code (e.g. "en", "pt", "es", "fr").
+  string language = 10;
+
+  // Deep beliefs evolved through Solomonoff induction during sleep cycles.
+  repeated string core_beliefs = 11;
+
+  // Surface-level beliefs directly derived from user interactions.
+  repeated string surface_beliefs = 12;
+}
