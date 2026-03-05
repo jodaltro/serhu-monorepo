@@ -127,6 +127,9 @@ class TestDreamPruning:
 class TestSleepCycleSemantization:
     """Tests for the semantization phase of the sleep cycle."""
 
+    def _make_state(self) -> PersonalityState:
+        return PersonalityState(being_id="semantize-test", name="Tester")
+
     def test_extracts_facts_from_frequent_words(self):
         episodes = [
             {"content": "I love painting landscapes"},
@@ -134,7 +137,7 @@ class TestSleepCycleSemantization:
             {"content": "I painted something today"},
         ]
         cycle = SleepCycle()
-        facts = cycle._semantize(episodes)
+        facts = cycle._semantize(episodes, self._make_state())
         assert any("painting" in f.lower() for f in facts)
 
     def test_no_facts_from_infrequent_words(self):
@@ -143,13 +146,13 @@ class TestSleepCycleSemantization:
             {"content": "Another different sentence"},
         ]
         cycle = SleepCycle()
-        facts = cycle._semantize(episodes)
+        facts = cycle._semantize(episodes, self._make_state())
         # No word appears ≥2 times (except short words ≤4 chars)
         assert len(facts) == 0
 
     def test_empty_episodes_produce_no_facts(self):
         cycle = SleepCycle()
-        facts = cycle._semantize([])
+        facts = cycle._semantize([], self._make_state())
         assert facts == []
 
 
