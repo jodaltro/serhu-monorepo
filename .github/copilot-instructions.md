@@ -239,6 +239,118 @@ assert orch.personality.language == "pt"
 # Os prompts incluem: Erikson em PT, Piaget em PT, etc.
 ```
 
+## **Integração com GPT-5.4: Motor LLM para Vigília e Sono**
+
+A camada de inteligência artificial do Ser é alimentada pelo **GPT-5.4** da OpenAI, integrado através do módulo `llm/` do orquestrador. O GPT-5.4 atua em dois momentos fundamentais do ciclo de vida do Ser: durante a **vigília** (interação ativa) e durante o **sono** (consolidação offline).
+
+### **Arquitetura do Módulo LLM**
+
+O módulo `llm/` implementa o padrão **Protocol** (tipagem estrutural) para permitir a troca de provedores sem alterar o código consumidor:
+
+| Arquivo | Responsabilidade |
+| :---- | :---- |
+| `llm/llm_client.py` | Protocolo abstrato `LLMClient` com 4 métodos: `chat`, `analyze_traits`, `extract_semantic_facts`, `derive_beliefs` |
+| `llm/openai_client.py` | Implementação concreta `OpenAIClient` usando GPT-5.4 via SDK OpenAI |
+| `llm/__init__.py` | Exporta `LLMClient`, `LLMResponse`, `OpenAIClient` |
+
+### **Integração na Vigília (Wakefulness)**
+
+Durante a fase de vigília, o GPT-5.4 é utilizado em dois fluxos:
+
+1. **Geração de Respostas (`Orchestrator.chat()`):**
+   - Constrói o system prompt com persona-tags (HEXACO, TCI-R, Schwartz, Piaget, Erikson).
+   - Envia o histórico de conversação da working memory ao GPT-5.4.
+   - O modelo responde assumindo a voz, limitações cognitivas e vieses emocionais do Ser.
+   - A resposta é armazenada na memória como mensagem do Ser.
+
+2. **Extração Automática de Traços (`LLMClient.analyze_traits()`):**
+   - Após cada turno de conversa, o GPT-5.4 atua como **classificador psicométrico**.
+   - Analisa a troca conversacional e retorna deltas de traços HEXACO/TCI-R/Schwartz em formato JSON estruturado.
+   - Os deltas são clamped entre -0.05 e +0.05 por turno, garantindo evolução gradual.
+   - Substitui a necessidade de fornecer `trait_deltas` manualmente no `process_message()`.
+
+### **Integração no Sono (Sleep)**
+
+O ciclo de sono é enriquecido pelo GPT-5.4 em duas fases:
+
+1. **Semantização Enriquecida (`SleepCycle._semantize()`):**
+   - O GPT-5.4 analisa os episódios recentes e extrai **fatos semânticos ricos**: temas recorrentes, preferências do usuário e padrões emocionais.
+   - Substitui a análise rule-based de frequência de palavras com compreensão contextual profunda.
+   - Em caso de falha da API, o sistema **cai automaticamente para o método rule-based** original.
+
+2. **Derivação de Crenças Junguiana (`SleepCycle._extract_beliefs()`):**
+   - O GPT-5.4 atua como o **Observador Junguiano**, analisando as hipóteses geradas pelos rollouts AIXI.
+   - Avalia quais padrões oníricos devem se tornar crenças permanentes versus adaptações transitórias.
+   - Em caso de falha, o fallback rule-based gera crenças no formato `"Learned: {action} (confidence={reward})"`.
+
+### **Backward Compatibility e Fallback**
+
+A integração é **totalmente opcional**:
+- Sem `llm_client`: O orquestrador funciona exatamente como antes. Apenas `process_message()` está disponível para vigília, e o sono usa lógica rule-based.
+- Com `llm_client`: O método `chat()` gera respostas e extrai traços automaticamente. O sono produz fatos semânticos e crenças mais ricos.
+- Todas as chamadas LLM possuem fallback gracioso: se a API falhar, o comportamento rule-based é ativado automaticamente.
+
+### **Configuração**
+
+| Variável de Ambiente | Descrição |
+| :---- | :---- |
+| `OPENAI_API_KEY` | Chave de API da OpenAI |
+| `OPENAI_MODEL` | Modelo a utilizar (padrão: `gpt-5.4`) |
+
+### **Exemplo de Uso com GPT-5.4**
+
+```python
+from serhu_orchestrator.orchestrator import Orchestrator
+from serhu_orchestrator.llm.openai_client import OpenAIClient
+
+# Criar cliente LLM
+llm = OpenAIClient(api_key="sk-...", model="gpt-5.4")
+
+# Criar Ser com LLM integrado
+orch = Orchestrator(
+    being_name="Luna",
+    language="pt",
+    qdrant_url="...",
+    qdrant_api_key="...",
+    supabase_url="...",
+    supabase_key="...",
+    llm_client=llm,
+)
+
+# Vigília: chat com extração automática de traços
+response, context = orch.chat("Olá, me conte sobre as estrelas!")
+# response = resposta do Ser gerada pelo GPT-5.4
+# traços HEXACO/TCI/Schwartz atualizados automaticamente
+
+# Sono: semantização e crenças enriquecidas pelo GPT-5.4
+result = orch.sleep(num_rollouts=1000, svd_rank=8)
+# result.facts_extracted → fatos semânticos ricos (via LLM)
+# result.beliefs_added → crenças derivadas pelo Observador Junguiano (via LLM)
+```
+
+### **Fluxo Completo com GPT-5.4**
+
+```
+Orchestrator.chat(user_message)
+  → MemoryManager.add_interaction("user", message)
+  → build_system_prompt(personality)  # XML com HEXACO/TCI/Schwartz/Piaget
+  → OpenAIClient.chat(system_prompt, messages)  # GPT-5.4 gera resposta
+  → MemoryManager.add_interaction("being", response)
+  → OpenAIClient.analyze_traits(prompt, user_msg, being_resp)  # Extrai deltas
+  → PersonalityEngine.update_traits(state, deltas)  # Aplica evolução
+
+Orchestrator.sleep()
+  → SleepCycle.run(state, episodes, llm_client=llm)
+    → _semantize(episodes, state)
+      → OpenAIClient.extract_semantic_facts(episodes, summary)  # GPT-5.4
+      → fallback: _rule_based_semantize(episodes)
+    → DreamEngine.perform_dream_rollouts(...)  # AIXI rollouts (inalterado)
+    → DreamEngine.dream_pruning(...)  # SVD consolidation (inalterado)
+    → _extract_beliefs(hypotheses, state)
+      → OpenAIClient.derive_beliefs(hypotheses, summary)  # GPT-5.4
+      → fallback: _rule_based_extract_beliefs(hypotheses)
+```
+
 ## **Conclusões e Recomendações para o Futuro do Ser**
 
 O desafio de criar um ser artificial tabula rasa com alta granularidade transcende a engenharia de software convencional. Ele exige a construção de um espelho psicológico dinâmico, onde a IA não apenas "conversa", mas "se torna".
