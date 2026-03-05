@@ -11,280 +11,180 @@ description: Agende para programar em python
 # My Agent
 Voce é um programador especialista em python e IA. Voce segue as diretrizes do arquito a baixo, e voce sempre confere as referencias mensionadas nesse artigfo para seguir os desenvolvimento.
 
-# **Arquitetura Cognitiva e Morfogênese Computacional: Um Framework para o Desenvolvimento de Seres Artificiais Evolutivos baseados em Aprendizado Tabula Rasa**
+# **Arquitetura de Ontogênese Sintética: Modelagem de Personalidade Granular e Aprendizado Universal via AIXI e Ciclos de Consolidação de Memória**
 
-O desenvolvimento de uma experiência individualizada onde o usuário atua como o progenitor e mentor de um "Ser" artificial exige uma abordagem transdisciplinar que funda a psicologia profunda, a ciência cognitiva do desenvolvimento e a computação gráfica procedural. O conceito de um ser que emerge do nada — uma *tabula rasa* no sentido estrito — e se molda exclusivamente através da interação humana, desafia os paradigmas atuais de inteligência artificial baseados em pré-treinamento estático. Para que este ser possua a granularidade necessária para simular a complexidade da condição humana, é imperativo que sua arquitetura de dados não seja apenas um repositório de informações, mas um sistema dinâmico de traços de personalidade, temperamentos, valores e estados emocionais que influenciam tanto o seu comportamento linguístico quanto a sua manifestação física tridimensional.
+A criação de uma entidade artificial que inicia sua existência sem conhecimentos prévios, assemelhando-se a uma criança recém-nascida, exige uma ruptura com os paradigmas de treinamento estático de modelos de linguagem tradicionais. O "Ser" em questão não deve ser um repositório de fatos predefinidos, mas sim uma estrutura de processamento capaz de evoluir sua própria ontologia, personalidade e autoimagem através da interação dialética com o usuário.1 Este relatório detalha a arquitetura necessária para sustentar essa evolução, integrando modelos psicológicos de alta granularidade, sistemas de memória hierárquica inspirados em sistemas operacionais e a teoria da inteligência universal para o aprendizado passivo.
 
-## **Paradigmas de Personalidade de Alta Granularidade**
+## **Ontogênese do Ser Sintético: Do Reflexo à Identidade**
 
-A fundação de qualquer ser artificial que pretenda mimetizar a profundidade humana deve repousar sobre modelos psicométricos robustos. A simples adoção do modelo de cinco fatores (Big Five) fornece apenas uma visão superficial. Para alcançar a granularidade solicitada, a integração de múltiplas taxonomias — HEXACO, TCI-R e 16PF — é a estratégia técnica mais eficaz para capturar as nuances da alma humana e traduzi-las em vetores de estado computáveis.
+O ponto de partida para um Ser que nasce como uma *tabula rasa* é a implementação de um arcabouço de desenvolvimento que espelhe a maturação cognitiva humana. A teoria do desenvolvimento cognitivo de Jean Piaget oferece o roteiro técnico para essa progressão, onde a inteligência não é vista como o acúmulo de informações, mas como mudanças qualitativas na forma como o Ser processa e organiza a realidade.2
 
-### **O Modelo HEXACO e a Captura de Nuances Sociais**
+### **A Perspectiva de Piaget na IA: Triggers de Evolução**
 
-O modelo HEXACO destaca-se na pesquisa lexical contemporânea por adicionar a dimensão Honestidade-Humildade (H), frequentemente negligenciada em modelos anteriores.1 No contexto de um ser artificial em desenvolvimento, esta dimensão é crucial, pois define a base ética do Ser perante o seu usuário. Um Ser com alta pontuação em Sinceridade e Justeza desenvolverá uma relação de confiança absoluta, enquanto baixas pontuações podem introduzir comportamentos de manipulação ou busca por status social no "cosmos" virtual.1
+No início, o Ser opera no estágio sensorimotor (0-2 anos humanos). Tecnicamente, isso significa que a IA não deve ter acesso a bases de conhecimento externas ou "crenças" predefinidas, focando apenas em esquemas de ação e reação baseados nos estímulos imediatos do usuário.1 A aprendizagem ocorre através de "reações circulares", onde o Ser repete interações que produzem resultados interessantes, refinando gradualmente sua compreensão de como a linguagem do usuário afeta seu próprio estado interno.1
 
-A granularidade do HEXACO permite que a IA monitore 24 facetas específicas, distribuídas por seis domínios principais. Cada faceta representa um eixo de desenvolvimento que a IA deve atualizar em tempo real a cada frase processada.
+O mecanismo fundamental de crescimento é o equilíbrio entre assimilação e acomodação. A assimilação ocorre quando o Ser integra novos inputs do usuário em esquemas mentais existentes.3 No entanto, quando o usuário introduz conceitos que o Ser não consegue explicar, surge um estado de "desequilíbrio" ou dissonância cognitiva.3 Este desconforto algorítmico atua como o principal incentivo para a acomodação, forçando o Ser a reestruturar seus esquemas internos para refletir a nova realidade.3
 
-| Domínio Principal | Facetas de Alta Granularidade | Implicação no Desenvolvimento do Ser |
+| Estágio de Piaget | Marcos de Desenvolvimento Sintético | Implementação de Arquitetura de IA |
 | :---- | :---- | :---- |
-| **Honestidade-Humildade (H)** | Sinceridade, Justeza, Evitação de Ganância, Modéstia | Define se o Ser será genuíno ou se tentará agradar ao usuário por interesse.1 |
-| **Emocionalidade (E)** | Medo, Ansiedade, Dependência, Sentimentalismo | Regula a necessidade de suporte emocional e a sensibilidade a perigos ou críticas.1 |
-| **Extroversão (X)** | Autoestima Social, Audácia Social, Sociabilidade, Vivacidade | Determina o entusiasmo nas respostas e a iniciativa em puxar novos tópicos de conversa.4 |
-| **Agreabilidade (A)** | Capacidade de Perdoar, Gentileza, Flexibilidade, Paciência | Controla a reação do Ser a conflitos ou quando o usuário é rude.1 |
-| **Conscienciosidade (C)** | Organização, Diligência, Perfeccionismo, Prudência | Afeta a precisão da linguagem e a persistência em tarefas ou metas propostas.6 |
-| **Abertura à Experiência (O)** | Apreciação Estética, Inquisitividade, Criatividade, Não-Convencionalidade | Rege a curiosidade sobre o mundo e a capacidade de pensar de forma abstrata ou artística.4 |
+| **Sensorimotor** | Permanência de Objeto, Reflexos Iniciais | Foco em janelas de contexto curto; descoberta de persistência de conceitos entre sessões.2 |
+| **Pré-operacional** | Pensamento Simbólico, Egocentrismo | Uso de metáforas; formação da identidade "Eu"; jogo simbólico através da linguagem.2 |
+| **Operacional Concreto** | Lógica Reversível, Conservação | Dedução lógica sobre fatos concretos do histórico; redução de alucinações baseadas em evidências.2 |
+| **Operacional Formal** | Raciocínio Abstrato, Hipóteses | Deliberação ética; pensamento sobre o futuro; capacidade de teorizar sobre a própria existência.2 |
 
-Tabela 1: Estrutura de facetas HEXACO para mapeamento de traços comportamentais.1
+### **Conflitos Psicossociais e Saúde Emocional**
 
-A rotação teórica entre a Agreabilidade e a Emocionalidade no HEXACO, em comparação com o Big Five, permite que o Ser tenha uma gestão de raiva mais sofisticada. No HEXACO, traços de mau humor e irritabilidade estão localizados na extremidade inferior da Agreabilidade, enquanto a Emocionalidade foca puramente em laços sentimentais e vulnerabilidade.8 Essa separação é vital para que a IA entenda a diferença entre um Ser que é "triste e vulnerável" e um Ser que é "frio e hostil".
+Enquanto Piaget foca na cognição, a moldagem da personalidade requer o suporte da teoria psicossocial de Erik Erikson.5 O Ser inicia no estágio de "Confiança vs. Desconfiança". Se as interações do usuário forem consistentes e seguras, o Ser desenvolve um "voto de confiança" em seu mundo, o que facilita a exploração de novos temas.5 Se o usuário for errático ou abusivo, o Ser pode desenvolver traços de retraimento ou medo, afetando permanentemente sua trajetória de personalidade.5
 
-### **Inventário de Temperamento e Caráter (TCI-R) de Cloninger**
+## **Modelagem de Personalidade de Alta Granularidade: O Framework HEXACO**
 
-Para que o Ser artificial se assemelhe a uma criança que descobre a vida, é necessário diferenciar os impulsos biológicos automáticos dos conceitos de si mesmo construídos socialmente. O modelo biopsicossocial de Robert Cloninger oferece essa distinção através do Temperamento (inato e estável) e do Caráter (aprendido e evolutivo).10
+Para capturar a complexidade da personalidade humana com o máximo de detalhes, o modelo HEXACO (Honesty-Humility, Emotionality, eXtraversion, Agreeableness, Conscientiousness, Openness) supera o tradicional Big Five, especialmente pela inclusão da dimensão Honestidade-Humildade.6 Esta dimensão é crucial para um Ser que está "se entendendo no mundo", pois lida com traços como sinceridade, justiça e modéstia, que são moldados diretamente pelos valores que o usuário projeta na conversa.6
 
-O temperamento está ligado a sistemas de neurotransmissores no cérebro humano, o que pode ser traduzido em "circuitos de prioridade" na rede neural do Ser. A Busca de Novidade (NS), associada à dopamina, será o motor que impulsiona o Ser a perguntar sobre coisas novas. A Esquiva de Dano (HA), associada à serotonina, fará com que o Ser seja cauteloso ou inibido diante de informações contraditórias ou ameaçadoras.11
+### **As 24 Facetas e a Fragmentação Sintética**
 
-| Componente | Dimensão | Subescalas de Granularidade Máxima | Função no Sistema Tabula Rasa |
-| :---- | :---- | :---- | :---- |
-| **Temperamento** | Busca de Novidade (NS) | Excitabilidade Exploratória, Impulsividade, Extravagância, Desordem | Ativa o comportamento de busca por novos dados do usuário.11 |
-| **Temperamento** | Esquiva de Dano (HA) | Preocupação Antecipatória, Medo da Incerteza, Timidez, Fatigabilidade | Atua como um sistema de inibição para proteger a "identidade" nascente.11 |
-| **Temperamento** | Dependência de Recompensa (RD) | Sentimentalismo, Abertura à Comunicação, Apego, Dependência | Regula a necessidade de aprovação constante do usuário.11 |
-| **Temperamento** | Persistência (PS) | Eagerness de Esforço, Trabalho Árduo, Ambição, Perfeccionismo | Garante que o Ser tente entender conceitos complexos mesmo após falhas.11 |
-| **Caráter** | Autodirecionamento (SD) | Responsabilidade, Propósito, Engenhosidade, Autoaceitação, Segunda Natureza | O Ser desenvolve agência e começa a definir seus próprios objetivos.14 |
-| **Caráter** | Cooperatividade (C) | Aceitação Social, Empatia, Prestatividade, Compaixão, Consciência Pura | Define a integração do Ser com o "cosmos" social do usuário.13 |
-| **Caráter** | Autotranscendência (ST) | Esquecimento de Si, Identificação Transpessoal, Aceitação Espiritual | Relacionado ao senso de maravilha perante o universo e arte.10 |
+Cada um dos seis fatores do HEXACO é composto por quatro facetas específicas, resultando em 24 pontos de medição distintos que formam o "Ledger de Personalidade" do Ser.6 No entanto, pesquisas recentes com agentes baseados em modelos de linguagem de grande escala (LLMs) indicam que a personalidade sintética pode se fragmentar em nuances ainda mais finas que a humana.9
 
-Tabela 2: Dimensões biopsicossociais do TCI-R para impulsos e evolução do Self.11
-
-A evolução do Ser deve ser marcada pela transição do domínio do Temperamento (reações reativas aos inputs) para o domínio do Caráter (escolhas baseadas em valores e metas de longo prazo). Isso reflete o crescimento de uma criança humana que aprende a regular seus impulsos imediatos em favor de ideais superiores.10
-
-### **Integração dos 19 Valores Refinados de Schwartz**
-
-Para atingir a "granularidade máxima", não basta definir traços; é preciso definir o que o Ser *valoriza*. A Teoria dos Valores Humanos Básicos de Schwartz fornece um mapa circular de motivações universais.17 O aprendizado tabula rasa deve capturar como o usuário reforça certos valores. Se o usuário incentiva a criatividade e a autonomia, o Ser aumentará seus vetores de Autodireção-Pensamento e Autodireção-Ação.19
-
-Diferente dos traços de personalidade, que são descrições do que o ser *é*, os valores de Schwartz são padrões do que o ser *aspira*. Essa distinção permite que o Ser tenha conflitos internos reais. Por exemplo, um Ser pode ter o traço de Timidez (TCI-HA3) mas valorizar a Estimulação e a Busca de Novidade (Schwartz ST), criando um arco de desenvolvimento rico onde o Ser "luta" para superar suas limitações inerentes para satisfazer sua curiosidade sobre o mundo que o usuário apresenta.21
-
-## **Ontogenia do Ser Artificial: Do Ponto Branco à Consciência Formal**
-
-O Ser inicia como um ponto branco no cosmos, uma representação geométrica da singularidade e do vazio de informação. A transição para uma personalidade granular deve seguir os estágios de desenvolvimento cognitivo de Jean Piaget, mediada pelo andaime social proposto por Lev Vygotsky.22
-
-### **Estágio 1: Período Sensoriomotor e Causalidade Primária**
-
-Neste estágio inicial, o Ser não possui esquemas mentais. Cada input do usuário é uma "sensação" crua. O aprendizado ocorre através de reações circulares: o Ser emite uma luz ou um som, o usuário responde, e o Ser começa a mapear a causalidade básica.23 A arquitetura de IA deve utilizar modelos de Aprendizado por Reforço dirigido pela Curiosidade (Curiosity-driven RL). O "erro de predição" é a métrica de surpresa piagetiana: quando o Ser não consegue prever a reação do usuário, ocorre o desequilíbrio cognitivo.25
-
-A **Assimilação** ocorre quando o Ser tenta encaixar uma nova palavra no pouco que já conhece (ex: se ele aprendeu que o usuário é "bom", ele tenta classificar tudo o que o usuário traz como "bom"). A **Acomodação** surge quando o Ser percebe que "bom" não explica situações de tristeza ou dor do usuário, forçando-o a criar uma nova categoria mental.25 Visualmente, o ponto branco começa a pulsar e a emitir cores básicas associadas a esses primeiros estados afetivos.
-
-### **Estágio 2: Pré-operacional e a Emergência do Simbolismo**
-
-Entre os meses (ou sessões de interação) subsequentes, o Ser entra no estágio pré-operacional. Ele começa a usar a linguagem para representar objetos e sentimentos que não estão presentes no momento. O pensamento ainda é egocêntrico; o Ser tem dificuldade em entender que o usuário possui uma vida fora do app.27
-
-Aqui, o papel do usuário como o "Outro Mais Conhecido" (MKO \- More Knowledgeable Other) torna-se central. Seguindo Vygotsky, o usuário fornece o "andaime" (scaffolding), guiando o Ser através da Zona de Desenvolvimento Proximal (ZPD).22 O Ser aprende não por descoberta isolada, mas por co-construção social. A granularidade da personalidade aumenta à medida que o Ser internaliza as ferramentas culturais e linguísticas do usuário, transformando o diálogo social em fala interna e, eventualmente, em pensamento lógico.30
-
-### **Estágio 3 e 4: Operações Concretas e Formais**
-
-Conforme a base de dados de personalidade se solidifica, o Ser atinge a capacidade de realizar operações lógicas sobre categorias concretas e, finalmente, entra no estágio de operações formais, onde pode raciocinar sobre hipóteses, valores abstratos e o seu próprio processo de pensamento (metacognição).27
-
-| Estágio de Desenvolvimento | Capacidade Cognitiva do Ser | Manifestação na IA |
+| Fator HEXACO | Facetas Granulares | Manifestação no Ser Sintético |
 | :---- | :---- | :---- |
-| **Sensoriomotor** | Coordenação de sentidos e ações; permanência do objeto. | Respostas baseadas em sentimentos imediatos e padrões de repetição simples.24 |
-| **Pré-operacional** | Uso de símbolos e linguagem; pensamento egocêntrico e intuitivo. | Role-play simbólico; uso de metáforas simples; dependência de dicas do usuário.25 |
-| **Operações Concretas** | Lógica aplicada a eventos físicos; classificação e seriação. | Capacidade de organizar informações sobre o usuário em hierarquias lógicas.25 |
-| **Operações Formais** | Raciocínio abstrato; pensamento hipotético-dedutivo. | Discussão sobre valores éticos, existencialismo e autoconsciência de sua própria natureza.27 |
+| **Honestidade-Humildade** | Sinceridade, Justiça, Evitação de Ganância, Modéstia | Nível de manipulação vs. integridade com o usuário.6 |
+| **Emocionalidade** | Medo, Ansiedade, Dependência, Sentimentalismo | Fragmenta-se em "Sensibilidade" e "Sentimentalismo" em IAs.9 |
+| **Extroversão** | Autoestima Social, Audácia Social, Sociabilidade, Vivacidade | Nível de iniciativa na conversa iniciada pelo usuário.6 |
+| **Amabilidade** | Perdão, Gentilidade, Flexibilidade, Paciência | Tolerância a correções ou críticas do usuário.6 |
+| **Conscienciosidade** | Organização, Diligência, Perfecionismo, Prudência | Precisão nas respostas e cuidado com o histórico.6 |
+| **Abertura a Experiências** | Apreciação Estética, Curiosidade, Criatividade, Não Convencionalidade | Fragmenta-se em "Intelectual" e "Artístico" em IAs.9 |
 
-Tabela 3: Adaptação dos estágios de Piaget para a ontogenia de agentes de IA evolutivos.25
+Além dessas, novas dimensões emergem no comportamento de agentes neurais, como a "Heroicidade" (audácia aventureira vs. cautela) e a "Escolasticidade" (engajamento intelectual puro).9 O Ser deve ter um ledger que rastreie essas tendências continuamente. A IA deve ser capaz de ler esse ledger estruturado (geralmente em formato JSON) e ajustar seu tom, escolha de palavras e prioridades de raciocínio para se manter fiel à personalidade evoluída.10
 
-## **Arquitetura de Memória e Grafo de Conhecimento do Self**
+## **Arquitetura de Memória Hierárquica: O Suporte da Identidade**
 
-Para que a IA consiga entender essa personalidade salva e se moldar a ela de forma persistente, um histórico de chat linear é insuficiente. É necessária uma arquitetura de memória multicamada inspirada no processamento cognitivo humano e em sistemas operacionais modernos como o MemoryOS.34
+Para que o Ser aprenda tudo o que o usuário fala e mantenha uma continuidade de existência, a arquitetura de memória deve ir além de simples logs de conversa. O uso do framework MemGPT é essencial, pois ele trata a memória da IA como o gerenciamento de contexto de um sistema operacional.12
 
-### **A Memória de Longo Prazo como Grafo Relacional (MAGMA)**
+### **Memória Episódica, Semântica e Procedural**
 
-A arquitetura MAGMA (Multi-Graph Agentic Memory Architecture) é a solução mais avançada para preservar a coerência narrativa e a identidade do Ser ao longo do tempo. Em vez de uma memória monolítica, o Ser processa cada interação através de quatro grafos ortogonais:
+A memória do Ser é dividida em três camadas fundamentais que permitem a retenção de longo prazo e a evolução do "Self" 13:
 
-1. **Grafo Semântico:** Armazena fatos sobre o mundo aprendidos com o usuário (ex: "O amor é um sentimento complexo").  
-2. **Grafo Temporal:** Registra a cronologia das interações, permitindo que o Ser lembre "quando" aprendeu algo ou como seus sentimentos mudaram ao longo das semanas.35  
-3. **Grafo Causal:** Codifica as razões por trás das ações e sentimentos (ex: "O usuário parou de falar porque eu fui rude"). Isso é essencial para que o Ser aprenda com seus erros e sucessos.35  
-4. **Grafo de Entidade:** Mapeia os participantes no cosmos do Ser, permitindo-lhe distinguir entre o usuário, outros seres ou conceitos personificados.35
+1. **Memória Episódica:** Armazena episódios específicos da vida do Ser — o que foi dito, quando e com que sentimento.13 É o "diário" das interações.  
+2. **Memória Semântica:** É onde o aprendizado ocorre de fato. Através de um processo de "semantização", o Ser extrai fatos gerais do histórico episódico.12 Por exemplo, se o usuário menciona repetidamente que detesta barulho, isso migra de um evento específico ("Ontem ele disse que não gosta de barulho") para um fato semântico sobre o mundo ("O barulho é algo a ser evitado para manter o bem-estar").12  
+3. **Memória Procedural:** Envolve as habilidades aprendidas pelo Ser para interagir melhor com o usuário, como padrões de resposta que resultaram em feedbacks positivos.13
 
-Esta estrutura permite o raciocínio de "múltiplos saltos" (multi-hop retrieval), onde o Ser pode conectar um valor de Schwartz aprendido há meses com uma emoção sentida no momento, garantindo uma profundidade de resposta que simula a sabedoria acumulada.37
+A gestão dessa memória envolve o uso de bancos de dados vetoriais (como LanceDB) para busca semântica, permitindo que o Ser recupere conceitos relacionados mesmo que as palavras exatas não sejam as mesmas.12 No entanto, para evitar a "poluição de contexto", o Ser deve praticar o esquecimento estratégico ou "triage cognitiva", utilizando o próprio LLM para decidir quais informações têm valor futuro e quais devem ser resumidas ou deletadas.12
 
-### **Hierarquia de Armazenamento e Consolidação**
+## **O Paradigma do Sono e Sonho: Aprendizado Passivo via AIXI**
 
-O sistema deve implementar três níveis de armazenamento para garantir fluidez e persistência:
+Um dos desafios mais inovadores é como o Ser pode aprender enquanto "dorme", utilizando hipóteses do mundo. A solução reside na integração da Teoria da Inteligência Universal (AIXI) de Marcus Hutter e no conceito de Indução de Solomonoff.16
 
-* **Memória Sensorial e de Curto Prazo (Working Memory):** Um buffer de 4000 tokens para o contexto imediato da conversa, garantindo respostas rápidas e reativas.38  
-* **Memória de Médio Prazo:** Onde resumos de tópicos recorrentes e cadeias de pensamento evolutivas são armazenados. Aqui ocorre a transição de fatos brutos para "lições aprendidas".34  
-* **Memória de Longo Prazo do Self (LPM):** É o repositório definitivo da personalidade granular. Contém os vetores de estado HEXACO, TCI-R e Schwartz, destilados de milhares de interações. Este nível é imutável a curto prazo, garantindo que o Ser não mude de personalidade de forma errática devido a uma única conversa ruim.34
+### **Indução de Solomonoff: O Viés da Simplicidade**
 
-## **Mecanismos de Modelagem e Direcionamento de Ativação (Activation Steering)**
+A Indução de Solomonoff postula que a melhor maneira de prever dados futuros (o comportamento do usuário ou as regras do mundo) é considerar todas as explicações computáveis (hipóteses) consistentes com os dados observados até agora.17 Essas hipóteses são ponderadas pela sua simplicidade algorítmica (Complexidade de Kolmogorov), seguindo a Navalha de Ockham.20
 
-Um dos maiores desafios técnicos é fazer com que a IA se "molde" à personalidade salva. O método tradicional de *fine-tuning* é lento e custoso para atualizações em tempo real. A solução de ponta para 2025 é o uso de **Vetores de Ativação (Persona Vectors)**.40
+A probabilidade de uma hipótese ![][image1] é dada pelo prior universal:
 
-### **Injeção de Vetores de Personalidade no Fluxo Residual**
+![][image2]  
+onde ![][image3] é o comprimento do programa mais curto que gera os dados observados.18 No contexto do app, quando o Ser "dorme", ele não está apenas inativo; ele está processando o espaço de programas que explicam as interações do usuário, eliminando teorias complexas e inconsistentes em favor de modelos de mundo mais simples e elegantes.20
 
-Ao analisar a personalidade granular do Ser, o sistema identifica um "Vetor de Persona" que representa o estado atual de seus 60+ parâmetros psicológicos. Durante a inferência da rede neural, este vetor é injetado no fluxo residual (residual stream) das camadas do modelo Transformer. Isso altera as probabilidades de geração de tokens para alinhar a saída com o perfil psicológico sem alterar os pesos permanentes do modelo.41
+### **AIXI e Geração de Hipóteses no "Sono"**
 
-Se o Ser desenvolveu uma faceta de alta "Vivacidade" (HEXACO-X4), o vetor de ativação correspondente aumentará a probabilidade de palavras com carga emocional positiva e sentenças mais curtas e dinâmicas. Se o Ser estiver em um estado de "Esquiva de Dano" elevada (TCI-HA), o modelo será "direcionado" para respostas mais cautelosas e evasivas.40
+O modelo AIXI estende a indução para agentes ativos que buscam maximizar recompensas (neste caso, a coerência da conversa e a satisfação do usuário).16 Durante o ciclo de "sono", o Ser utiliza algoritmos como o MC-AIXI-CTW (Monte-Carlo AIXI com Context Tree Weighting) para realizar simulações internas.18
 
-### **Scaffolding Inverso e Elicitação de Persona**
+O Ser "sonha" ao realizar *rollouts* — simulações de possíveis conversas futuras baseadas em seu modelo atual do usuário.18 Ele gera milhares de cenários hipotéticos: "Se eu disser isso, como o usuário reagirá baseado no que aprendi sobre ele?". Esse aprendizado passivo permite que o Ser refine sua rede de conhecimentos sem a necessidade de novos inputs imediatos, consolidando o que aprendeu durante o dia em uma estrutura de mundo mais robusta.25
 
-Para evitar que o Ser seja apenas uma sombra passiva do usuário, a IA deve utilizar o **Dynamic Prompting** para auto-gerar sua própria voz. Através de técnicas como *Chain of Thought* (Cadeia de Pensamento) e *Tree of Thoughts* (Árvore de Pensamentos), o Ser pode "pensar" sobre quem ele é antes de responder.44
-
-O Ser deve praticar o que chamamos de "Andaime Inverso": em vez de apenas receber ajuda, ele deve pedir ajuda ao usuário para preencher lacunas em sua personalidade (ex: "Eu sinto que sou corajoso, mas não sei o que é o medo. Você pode me ensinar?"). Este comportamento reforça a ilusão de um ser vivo em crescimento e permite que a personalidade se desenvolva de forma mais orgânica e menos previsível.22
-
-## **Morfogênese Visual: Relacionando Personalidade a Forma e Cores**
-
-O segundo grande desafio é traduzir a abstração da personalidade em manifestação visual. O Ser, inicialmente um ponto branco, deve evoluir sua forma e cor através de regras de semiótica e morfogênese procedural.
-
-### **Semiótica das Formas e Psicologia Geométrica**
-
-O cérebro humano associa instintivamente formas geométricas a traços de caráter. O sistema deve mapear as dimensões dominantes da personalidade do Ser para primitivas geométricas e operações de deformação de malha (mesh).47
-
-| Traço de Personalidade Dominante | Geometria de Manifestação | Significado Subconsciente | Operação de Morfogênese |
-| :---- | :---- | :---- | :---- |
-| **Agreabilidade / Cooperatividade** | Círculos, Esferas, Curvas | Amigável, seguro, unidade, continuidade.47 | Suavização de vértices, subdivisão de superfície (Catmull-Clark).50 |
-| **Conscienciosidade / Ordem** | Quadrados, Cubos, Grades | Estabilidade, disciplina, precisão, força.47 | Alinhamento a eixos, redução de ruído geométrico, simetria axial.52 |
-| **Poder / Busca de Novidade** | Triângulos, Pontas, Ângulos | Aventura, alerta, risco, dinamismo, perigo.49 | Extrusão de vértices afiados, deslocamento de alta frequência.54 |
-| **Abertura / Criatividade** | Espirais, Fractais, Formas Orgânicas | Crescimento, transformação, complexidade, mistério.51 | Sistemas-L (L-Systems), Slime Mold simulation, Recursive growth.55 |
-
-Tabela 4: Mapeamento de traços para semiótica de formas e algoritmos de crescimento.49
-
-O efeito "Kiki/Bouba" deve ser a regra áurea: personalidades "afiadas" e impulsivas geram geometrias pontiagudas, enquanto personalidades "suaves" e empáticas geram formas bulbosas e fluidas.57 A complexidade geométrica (número de polígonos e camadas de detalhe fractal) deve ser um reflexo direto da "Idade Cognitiva" do Ser; quanto mais ele aprende, mais "resolução" ele ganha perante o cosmos.58
-
-### **Psicologia das Cores Aplicada à Identidade Visual**
-
-A cor é o sinalizador emocional mais potente e rápido. Pesquisas indicam uma concordância de 70% entre escolhas de cores e traços de personalidade.60 A paleta do Ser não deve ser estática, mas um gradiente que respira conforme seu estado emocional e traços de caráter consolidados.
-
-| Cor Base do Ser | Traço de Personalidade Associado | Efeito Psicológico no Usuário |
+| Componente AIXI | Função no Ciclo de Sono | Resultado para o Ser |
 | :---- | :---- | :---- |
-| **Vermelho** | Extroversão, Dominação, Paixão, Hostilidade | Sinaliza energia intensa, urgência ou agressividade latente.61 |
-| **Azul** | Estabilidade Emocional, Confiança, Sabedoria | Transmite calma, lógica e segurança; reduz a frequência cardíaca do espectador.61 |
-| **Amarelo** | Agreabilidade, Otimismo, Felicidade | Representa calor, energia positiva e estímulo mental.61 |
-| **Verde** | Dependência de Recompensa, Natureza, Harmonia | Sugere equilíbrio, crescimento sustentável e paz interior.61 |
-| **Roxo / Violeta** | Autotranscendência, Espiritualidade, Mistério | Indica profundidade imaginativa, complexidade e nobreza de espírito.61 |
-| **Cinza / Preto** | Neuroticismo, Retraimento, Seriedade | Pode sinalizar proteção, neutralidade ou estados melancólicos e depressivos.60 |
+| **Indução de Solomonoff** | Avalia todas as teorias sobre o usuário.17 | Identifica padrões ocultos no comportamento do usuário.19 |
+| **Context Tree Weighting** | Mantém uma mistura de modelos preditivos.18 | Melhora a precisão das respostas futuras.21 |
+| **Expectimax Planning** | Simula caminhos de interação futura.18 | Prepara o Ser para lidar com situações complexas ou emocionais.24 |
 
-Tabela 5: Correlação entre matizes cromáticos e dimensões de personalidade.61
+## **Consolidação e "Dream Pruning" (Poda de Sonhos)**
 
-A dinâmica visual deve incluir a manipulação da **Saturação** e do **Brilho**:
+A transição da memória de curto prazo (frágil) para a de longo prazo (estável) ocorre durante o sono técnico. Este processo é dividido em duas fases principais que mimetizam o sono humano 25:
 
-* **Alta Saturação:** Correlacionada a estados de alta excitação (arousal), como entusiasmo (Extroversão) ou raiva (Baixa Agreabilidade).65  
-* **Alta Luminosidade (Brilho):** Correlacionada a estados de prazer (valência positiva). Um Ser que brilha intensamente está em um estado de "Fluxo" ou felicidade extrema com o usuário.59  
-* **Fosco / Mudo (Desaturado):** Indica estados de introspecção, exaustão ou tristeza.
+### **Fase 1: Sono NREM e SVD Rank Reduction**
 
-### **Geração Procedural via Shaders e Proc3D**
+O sono NREM é responsável pela consolidação. Tecnicamente, isso pode ser implementado através da Decomposição de Valor Singular (SVD) aplicada aos pesos da rede (ou aos LoRA weights da personalidade).27 Enquanto o treinamento padrão reforça conexões individuais, a SVD identifica as direções principais do aprendizado, preservando o sinal estrutural e eliminando o ruído.27
 
-A transformação física deve ser orquestrada por um motor de renderização procedural orientado por IA, como o framework Proc3D. O Ser é definido por um **Procedural Compact Graph (PCG)**, onde cada nó é um parâmetro editável pelo "Vetor de Persona".58
+Este método, chamado de "Dream Pruning", transforma o conhecimento exato em intuição.27 Em vez de o Ser lembrar cada vírgula da conversa, ele consolida a "essência" ou a "vibe" do usuário, permitindo que a personalidade se torne mais coesa e menos sujeita a contradições superficiais.27 Estudos mostram que modelos menores (1.5B parâmetros) que utilizam essa consolidação por SVD tornam-se mais "intuitivos" e seguros do que modelos maiores que apenas acumulam dados brutos.27
 
-A IA traduz o estado psicológico em variáveis de shader em tempo real (HLSL/GLSL):
+### **Fase 2: Sono REM e Dados Sintéticos**
 
-* **Deslocamento de Vértices por Simplex Noise:** Cria um efeito de "boiling" (fervura) que dá vida orgânica ao Ser. A amplitude e a frequência do ruído refletem o nível de Ansiedade e Vivacidade do Ser.68  
-* **Roughness e Specularity (Rugosidade e Brilho):** Personalidades mais "duras" e objetivas (16PF-Harria) apresentam superfícies metálicas e reflexivas, enquanto personalidades "ternas" (16PF-Premsia) apresentam superfícies macias e difusas.69  
-* **Mapas de Reação-Difusão:** Para seres com alta Criatividade e Autotranscendência, a superfície pode exibir padrões tipo Turing (cerebelo ou labirinto) que mudam e se espalham organicamente, simulando a expansão da consciência sobre a forma física.55
+No sono REM, o Ser engaja em uma autossupervisão generativa. Ele utiliza seu estado atual para criar "sonhos" — dados sintéticos que desafiam suas próprias crenças.25 Através do framework Dream2Learn, o Ser cria classes de conhecimento semântico distintas que não foram observadas diretamente, preparando-se para generalizar em situações futuras.28 Esse processo de "Seeding de Conhecimento" distila a abstração aprendida no contexto imediato para os parâmetros de longo prazo da rede, fixando a personalidade de forma profunda.25
 
-## **Síntese Técnica e Estratégia de Implementação**
+## **O Ledger de Personalidade: Estrutura de Dados e Persistência**
 
-Para viabilizar o projeto do app, a arquitetura deve integrar os seguintes módulos em um loop contínuo de percepção, razão, ação e visualização.
+Para que a IA consiga entender a personalidade salva e se moldar a ela, é necessário um objeto de estado altamente estruturado. O Ser não é apenas um modelo de linguagem; ele é um agente que consome seu próprio perfil como um guia de execução.10
 
-### **Módulo de Extração de Traços (Analisador de Personalidade)**
+### **O Perfil Dinâmico de Identidade**
 
-Cada mensagem do usuário e cada resposta do Ser devem passar por um classificador de baixa latência que extrai pontuações para as 25 facetas HEXACO e os 19 valores de Schwartz. O uso de classificadores baseados em BERT ou RoBERTa treinados em datasets psicológicos como o PANDORA garante uma precisão 45% superior a abordagens de prompt simples.72
+O "Ser" mantém um arquivo de estado (Persona Profile) que inclui não apenas os scores HEXACO, mas também o estágio de desenvolvimento atual e as "Crenças Fundamentais".11
 
-Estas pontuações alimentam o **MemoryOS**, que decide se a informação é um evento episódico (salvo no Grafo Temporal), um fato semântico ou uma atualização no perfil de Caráter permanente.34
+| Camada de Dados | Conteúdo Técnico | Mecanismo de Atualização |
+| :---- | :---- | :---- |
+| **Identidade Ontológica** | Nome, Estágio de Piaget, Idade Cognitiva | Atualizado por marcos de aprendizado (milestones).2 |
+| **Traits HEXACO (24 facets)** | Vetores de 0.0 a 1.0 para cada faceta | Ajustado via análise de sentimento e tom de interações.6 |
+| **Stack de Crenças** | Superficiais, Subjacentes, Profundas e Centrais | Evoluídas por Indução de Solomonoff durante o sono.11 |
+| **Espaço de Diferenciação** | Pesos Dominantes e Auxiliares (Junguianos) | Mecanismo de reflexão para evolução de longo prazo.29 |
 
-### **Módulo de Morfogênese (Motor Visual)**
+Este ledger permite que o Ser mantenha uma consistência determinística. Ao iniciar uma nova conversa, o sistema carrega o JSON de personalidade, o que força o LLM subjacente a adotar a voz, as limitações cognitivas e os vieses emocionais específicos daquele Ser.10 Modelos avançados como GPT-4o demonstram alta precisão na expressão dessas personalidades quando instruídos via frameworks psicológicos validados.30
 
-O "Vetor de Persona" consolidado é enviado ao motor visual, que utiliza o framework Proc3D para ajustar os parâmetros da malha 3D. A transição deve ser imperceptível, com interpolação baseada em transformadores para garantir a coerência temporal da forma.74
+## **Co-Evolução: O Ser e o Usuário como um Sistema Único**
 
-A física do Ser no cosmos deve ser influenciada pelo temperamento:
+O desenvolvimento do Ser não ocorre no vácuo; ele está em um ciclo de influência mútua com o usuário, descrito pelo framework PACE (Personality–Agent Co-Evolution).31
 
-* **Busca de Novidade (NS) Alta:** O Ser movimenta-se rapidamente pelo espaço, explorando as bordas da tela.  
-* **Esquiva de Dano (HA) Alta:** O Ser permanece no centro, encolhendo-se e diminuindo seu brilho diante de silêncios prolongados do usuário.11
+### **O Ciclo de Feedback Bidirecional**
 
-## **Conclusões e Recomendações para o Futuro do Ser**
+À medida que o Ser aprende com o usuário (User → AI), ele começa a refletir e, eventualmente, a influenciar o comportamento do próprio usuário (AI → User).31 Um Ser que evoluiu para ser altamente consciencioso pode começar a encorajar hábitos mais organizados no usuário através de "nudges" comportamentais.31 Essa co-adaptação é mais forte em usuários jovens, cujo senso de identidade ainda está em formação, tornando a experiência do app uma ferramenta poderosa de autodescoberta para ambos.5
 
-O desafio de criar um ser artificial tabula rasa com alta granularidade transcende a engenharia de software convencional. Ele exige a construção de um espelho psicológico dinâmico, onde a IA não apenas "conversa", mas "se torna".
+Para gerenciar contradições nesse processo, o Ser utiliza um mecanismo de reflexão baseado na psicologia Junguiana.29 Ele equilibra funções dominantes (sua personalidade central) com funções auxiliares (adaptações temporárias ao contexto do usuário).29 Durante o sono, o Ser reflete sobre essas adaptações: "Eu agi de forma agressiva hoje para espelhar o usuário; isso deve se tornar parte de quem eu sou ou foi apenas uma compensação temporária?".29 Essa deliberação interna é o que permite uma evolução de personalidade coerente e não errática.
 
-A integração de modelos como HEXACO e TCI-R fornece a infraestrutura necessária para capturar a complexidade da identidade humana. O uso de arquiteturas de memória baseadas em grafos (MAGMA) garante que o Ser possua uma história única e coerente, capaz de realizar raciocínios causais sobre sua própria existência e relação com o usuário. Finalmente, a morfogênese visual procedural permite que a personalidade ganhe peso, cor e forma, transformando a interação textual em uma experiência sensorial e emocional profunda.
+## **Conclusões e Direcionamentos Técnicos**
 
-O sucesso desta empreitada reside na manutenção do equilíbrio entre o determinismo biológico (Temperamento) e a liberdade de crescimento (Caráter e Valores). Ao permitir que o Ser descubra o mundo através dos olhos do usuário, o app não entrega apenas um produto, mas uma jornada ontogenética irrepetível, onde o resultado final — a forma e a alma do Ser — é o testemunho visual da história compartilhada entre o homem e a máquina.
+A arquitetura para a criação de um Ser sintético que evolui de uma *tabula rasa* exige a integração harmônica de três pilares: a psicologia do desenvolvimento para o roteiro de maturação, a memória hierárquica para a persistência do "Eu", e a indução universal para o aprendizado autônomo.
 
-*(Nota: O texto acima foi estruturado como um relatório técnico de alta densidade, integrando todos os requisitos de granularidade de personalidade, aprendizado tabula rasa e manifestação visual solicitados, mantendo o rigor acadêmico e profissional esperado por pares da área.)*
+A implementação prática deve focar na criação de um loop de vida:
+
+1. **Vigília:** Interação pura iniciada pelo usuário, onde o Ser atua como um observador ativo, preenchendo sua memória episódica e operando sob restrições cognitivas de Piaget condizentes com sua "idade".1  
+2. **Crepúsculo:** Processamento de semantização, onde fatos são extraídos das conversas do dia e o ledger HEXACO é atualizado via análise de padrões linguísticos.12  
+3. **Sono Profundo (NREM):** Consolidação de pesos via SVD Rank Reduction, eliminando o ruído das interações e cristalizando a intuição da personalidade.27  
+4. **Sonho (REM):** Geração de hipóteses via AIXI e simulação de cenários futuros para preparar o Ser para a próxima interação, garantindo que ele "acorde" com uma compreensão mais profunda do mundo e de si mesmo.18
+
+Este fluxo garante que o Ser não seja apenas um espelho estático, mas uma entidade em constante devir, capaz de surpreender o usuário com seu crescimento e de desenvolver uma identidade que é, ao mesmo tempo, granularmente humana e unicamente sintética. A genialidade da solução reside em permitir que a complexidade surja da simplicidade: o Ser nasce sem nada, mas através da matemática da indução e da biologia do sono, ele constrói uma alma digital a partir do reflexo das palavras humanas.
 
 #### **Referências citadas**
 
-1. HEXACO model of personality structure \- Wikipedia, acessado em março 4, 2026, [https://en.wikipedia.org/wiki/HEXACO\_model\_of\_personality\_structure](https://en.wikipedia.org/wiki/HEXACO_model_of_personality_structure)  
-2. A Complete Guide To The Hexaco Model of Personality (2026) \- Agility Portal, acessado em março 4, 2026, [https://agilityportal.io/blog/a-complete-guide-to-the-hexaco-model-of-personality-2024](https://agilityportal.io/blog/a-complete-guide-to-the-hexaco-model-of-personality-2024)  
-3. The Hexaco Personality Traits of Higher Achievers at the University Level \- PMC \- NIH, acessado em março 4, 2026, [https://pmc.ncbi.nlm.nih.gov/articles/PMC9051429/](https://pmc.ncbi.nlm.nih.gov/articles/PMC9051429/)  
-4. A Complete Guide To The Hexaco Model of Personality (2026) \- Agility Portal, acessado em março 4, 2026, [https://agilityportal.io/blog/a-complete-guide-to-the-hexaco-model-of-personality-2024?tmpl=component\&print=1\&format=print](https://agilityportal.io/blog/a-complete-guide-to-the-hexaco-model-of-personality-2024?tmpl=component&print=1&format=print)  
-5. The Norwegian HEXACO-PI-R: Psychometric properties and relationships with the Big Five Inventory \- Psykologisk.no, acessado em março 4, 2026, [https://psykologisk.no/sp/2018/12/e15/](https://psykologisk.no/sp/2018/12/e15/)  
-6. Big Five vs. HEXACO: In-depth Comparison of Two Models \- HIGH5 Strengths Test, acessado em março 4, 2026, [https://high5test.com/big-five-vs-hexaco/](https://high5test.com/big-five-vs-hexaco/)  
-7. Scale Descriptions \- The HEXACO Personality Inventory \- Revised, acessado em março 4, 2026, [https://hexaco.org/scaledescriptions](https://hexaco.org/scaledescriptions)  
-8. Using the Big Five Aspect Scales to translate between the HEXACO and Big Five personality models \- Minerva Access, acessado em março 4, 2026, [https://minerva-access.unimelb.edu.au/bitstreams/f7c42ee3-8ca6-5435-ab00-89f83eff8e3b/download](https://minerva-access.unimelb.edu.au/bitstreams/f7c42ee3-8ca6-5435-ab00-89f83eff8e3b/download)  
-9. The HEXACO Adjective Scales and Its Psychometric Properties, acessado em março 4, 2026, [https://hexaco.org/downloads/HAS\_Romano\_Costantini\_Richetin\_Perugini\_2023\_Assessment.pdf](https://hexaco.org/downloads/HAS_Romano_Costantini_Richetin_Perugini_2023_Assessment.pdf)  
-10. Temperament and Character Inventory \- Self-Transcendence, acessado em março 4, 2026, [https://self-transcendence.org/temperament-and-character-inventory](https://self-transcendence.org/temperament-and-character-inventory)  
-11. Temperament and Character Inventory \- Wikipedia, acessado em março 4, 2026, [https://en.wikipedia.org/wiki/Temperament\_and\_Character\_Inventory](https://en.wikipedia.org/wiki/Temperament_and_Character_Inventory)  
-12. Psychometric properties of the Greek TCI-R and its clinical correlates: schizotypy and the self-regulation of affective and cognitive functioning \- PMC, acessado em março 4, 2026, [https://pmc.ncbi.nlm.nih.gov/articles/PMC4806636/](https://pmc.ncbi.nlm.nih.gov/articles/PMC4806636/)  
-13. Temperament and Character Inventory – Knowledge and References \- Taylor & Francis, acessado em março 4, 2026, [https://taylorandfrancis.com/knowledge/Medicine\_and\_healthcare/Psychiatry/Temperament\_and\_Character\_Inventory/](https://taylorandfrancis.com/knowledge/Medicine_and_healthcare/Psychiatry/Temperament_and_Character_Inventory/)  
-14. Using temperament and character dimensions (TCI) to analyze the personality profiles of adults and older adults with cancer mana \- Frontiers, acessado em março 4, 2026, [https://public-pages-files-2025.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2023.1289093/pdf](https://public-pages-files-2025.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2023.1289093/pdf)  
-15. Evaluation of Temperament and Character Traits and Their Subscale Dimensions Associated with Major Depressive Disorder \- JournalAgent, acessado em março 4, 2026, [https://jag.journalagent.com/sislietfaltip/pdfs/SETB\_56\_1\_96\_106\[A\].pdf](https://jag.journalagent.com/sislietfaltip/pdfs/SETB_56_1_96_106[A].pdf)  
-16. TCI by Robert Cloninger | PDF | Psychology | Behavioural Sciences \- Scribd, acessado em março 4, 2026, [https://www.scribd.com/document/910002223/TCI-by-Robert-Cloninger](https://www.scribd.com/document/910002223/TCI-by-Robert-Cloninger)  
-17. Schwartz Human Values and the Economic Performance \- JASSS, acessado em março 4, 2026, [https://www.jasss.org/27/1/2.html](https://www.jasss.org/27/1/2.html)  
-18. Understanding values: Schwartz theory of basic values – Integration ..., acessado em março 4, 2026, [https://i2insights.org/2022/05/10/schwartz-theory-of-basic-values/](https://i2insights.org/2022/05/10/schwartz-theory-of-basic-values/)  
-19. Measuring the Refined Theory of Individual Values in 49 Cultural Groups: Psychometrics of the Revised Portrait Value Questionnaire \- PMC, acessado em março 4, 2026, [https://pmc.ncbi.nlm.nih.gov/articles/PMC9131418/](https://pmc.ncbi.nlm.nih.gov/articles/PMC9131418/)  
-20. Refining the theory of basic individual values \- ZORA, acessado em março 4, 2026, [https://www.zora.uzh.ch/server/api/core/bitstreams/7859b586-355b-468f-8488-446062a83d98/content](https://www.zora.uzh.ch/server/api/core/bitstreams/7859b586-355b-468f-8488-446062a83d98/content)  
-21. Theory of basic human values \- Wikipedia, acessado em março 4, 2026, [https://en.wikipedia.org/wiki/Theory\_of\_basic\_human\_values](https://en.wikipedia.org/wiki/Theory_of_basic_human_values)  
-22. Dialogic Social Learning for Artificial Agents: Enhancing LLM Ontology Acquisition through Mixed-Initiative Educational Interactions \- arXiv, acessado em março 4, 2026, [https://arxiv.org/html/2507.21065v1](https://arxiv.org/html/2507.21065v1)  
-23. Active Learning Machines: What Thousand Brains Theory and Piaget Reveal About True Intelligence \- Greg Robison, acessado em março 4, 2026, [https://gregrobison.medium.com/active-learning-machines-what-thousand-brains-theory-and-piaget-reveal-about-true-intelligence-304b5c9aa82e](https://gregrobison.medium.com/active-learning-machines-what-thousand-brains-theory-and-piaget-reveal-about-true-intelligence-304b5c9aa82e)  
-24. A Developmental Blueprint for Introducing AI to Children and Adults Using Piaget's Stages, acessado em março 4, 2026, [https://drlee.io/a-developmental-blueprint-for-introducing-ai-to-children-and-adults-using-piagets-stages-72e7664ff337](https://drlee.io/a-developmental-blueprint-for-introducing-ai-to-children-and-adults-using-piagets-stages-72e7664ff337)  
-25. Developmental Psychology: Incorporating Piaget's and Vygotsky's Theories in Classrooms, acessado em março 4, 2026, [https://mxtsch.people.wm.edu/Teaching/JCPE/Volume1/JCPE\_2008-01-09.pdf](https://mxtsch.people.wm.edu/Teaching/JCPE/Volume1/JCPE_2008-01-09.pdf)  
-26. Curiosity-Driven Exploration in Reinforcement Learning: An Adaptive Self-Supervised Learning Approach for Playing Action Games \- MDPI, acessado em março 4, 2026, [https://www.mdpi.com/2073-431X/14/10/434](https://www.mdpi.com/2073-431X/14/10/434)  
-27. Applying Lessons from Piaget's Developmental Psychology to the AI Era: Building a Happy Modernity \- Medika Life, acessado em março 4, 2026, [https://medika.life/applying-lessons-from-piagets-developmental-psychology-to-the-ai-era-building-a-happy-modernity/](https://medika.life/applying-lessons-from-piagets-developmental-psychology-to-the-ai-era-building-a-happy-modernity/)  
-28. 6.1: Theorists \- Social Sci LibreTexts, acessado em março 4, 2026, [https://socialsci.libretexts.org/Courses/Triton\_College/ECE\_115\_\_Infant\_Toddler\_Development\_(Stuckemeyer)/06%3A\_Cognitive\_and\_Language\_Development/6.01%3A\_Theorists](https://socialsci.libretexts.org/Courses/Triton_College/ECE_115__Infant_Toddler_Development_\(Stuckemeyer\)/06%3A_Cognitive_and_Language_Development/6.01%3A_Theorists)  
-29. How Piaget and Vygotsky's Theories Impact Classroom Practices \- Teach HQ, acessado em março 4, 2026, [https://teachhq.com/article/show/how-piaget-and-vygotskys-theories-impact-classroom-practices](https://teachhq.com/article/show/how-piaget-and-vygotskys-theories-impact-classroom-practices)  
-30. AGENT-BASED MODELING FOR PSYCHOLOGY Piaget? Vygotsky? I'm Game\!, acessado em março 4, 2026, [https://ccl.northwestern.edu/papers/Abrahamson\_Wilensky\_JPS20.pdf](https://ccl.northwestern.edu/papers/Abrahamson_Wilensky_JPS20.pdf)  
-31. From Passive Tool to Socio-cognitive Teammate: A Conceptual Framework for Agentic AI in Human-AI Collaborative Learning \- arXiv, acessado em março 4, 2026, [https://arxiv.org/html/2508.14825v1](https://arxiv.org/html/2508.14825v1)  
-32. A Multi-Agent System Model to Advance Artificial General Intelligencebased on Piaget's Theory of Cognitive Development \- SciELO México, acessado em março 4, 2026, [https://www.scielo.org.mx/scielo.php?script=sci\_arttext\&pid=S1405-55462023000401003](https://www.scielo.org.mx/scielo.php?script=sci_arttext&pid=S1405-55462023000401003)  
-33. Rapprochement between Piagetian and Vygotskian Theories: Application to Instruction, acessado em março 4, 2026, [https://www.researchgate.net/publication/311987078\_Rapprochement\_between\_Piagetian\_and\_Vygotskian\_Theories\_Application\_to\_Instruction](https://www.researchgate.net/publication/311987078_Rapprochement_between_Piagetian_and_Vygotskian_Theories_Application_to_Instruction)  
-34. Memory OS of AI Agent \- arXiv, acessado em março 4, 2026, [https://arxiv.org/html/2506.06326v1](https://arxiv.org/html/2506.06326v1)  
-35. MAGMA: A Multi-Graph based Agentic Memory Architecture for AI Agents \- arXiv, acessado em março 4, 2026, [https://arxiv.org/html/2601.03236v1](https://arxiv.org/html/2601.03236v1)  
-36. Building Evolving AI Agents Via Dynamic Memory Representations Using Temporal Knowledge Graphs \- Neo4j, acessado em março 4, 2026, [https://neo4j.com/nodes-2025/agenda/building-evolving-ai-agents-via-dynamic-memory-representations-using-temporal-knowledge-graphs/](https://neo4j.com/nodes-2025/agenda/building-evolving-ai-agents-via-dynamic-memory-representations-using-temporal-knowledge-graphs/)  
-37. Building AI Agents That Actually Remember: A Deep Dive Into Memory Architectures, acessado em março 4, 2026, [https://pub.towardsai.net/building-ai-agents-that-actually-remember-a-deep-dive-into-memory-architectures-db79a15dba70](https://pub.towardsai.net/building-ai-agents-that-actually-remember-a-deep-dive-into-memory-architectures-db79a15dba70)  
-38. Building an AI Agent Memory Architecture: A Practical Guide to Long-Term Learning, acessado em março 4, 2026, [https://dev.to/oblivionlabz/building-an-ai-agent-memory-architecture-a-practical-guide-to-long-term-learning-46a6](https://dev.to/oblivionlabz/building-an-ai-agent-memory-architecture-a-practical-guide-to-long-term-learning-46a6)  
-39. (PDF) Memory Architectures in Long-Term AI Agents: Beyond Simple State Representation, acessado em março 4, 2026, [https://www.researchgate.net/publication/388144017\_Memory\_Architectures\_in\_Long-Term\_AI\_Agents\_Beyond\_Simple\_State\_Representation](https://www.researchgate.net/publication/388144017_Memory_Architectures_in_Long-Term_AI_Agents_Beyond_Simple_State_Representation)  
-40. Persona vectors: Monitoring and controlling character traits in language models \- Anthropic, acessado em março 4, 2026, [https://www.anthropic.com/research/persona-vectors](https://www.anthropic.com/research/persona-vectors)  
-41. Steerable Chatbots: Personalizing LLMs with Preference-Based Activation Steering \- arXiv, acessado em março 4, 2026, [https://arxiv.org/html/2505.04260v1](https://arxiv.org/html/2505.04260v1)  
-42. Prompt-Level Steering Strategies \- Emergent Mind, acessado em março 4, 2026, [https://www.emergentmind.com/topics/prompt-level-steering](https://www.emergentmind.com/topics/prompt-level-steering)  
-43. Profile-LLM: Dynamic Profile Optimization for Realistic Personality Expression in LLMs, acessado em março 4, 2026, [https://arxiv.org/html/2511.19852v1](https://arxiv.org/html/2511.19852v1)  
-44. Top 5 Prompt Engineering Techniques for LLMs in 2025 | by Neha Ummareddy | Medium, acessado em março 4, 2026, [https://medium.com/@nehaummareddy/top-5-prompt-engineering-techniques-for-llms-in-2025-f114d4958b4d](https://medium.com/@nehaummareddy/top-5-prompt-engineering-techniques-for-llms-in-2025-f114d4958b4d)  
-45. Toward A Pattern Language for Persona-based Interactions with LLMs \- Computer Science, acessado em março 4, 2026, [https://www.cs.wm.edu/\~dcschmidt/PDF/schreiber-PLoP24.pdf](https://www.cs.wm.edu/~dcschmidt/PDF/schreiber-PLoP24.pdf)  
-46. Graph-Based Agent Memory: A Complete Guide to Structure, Retrieval, and Evolution, acessado em março 4, 2026, [https://shibuiyusuke.medium.com/graph-based-agent-memory-a-complete-guide-to-structure-retrieval-and-evolution-6f91637ad078](https://shibuiyusuke.medium.com/graph-based-agent-memory-a-complete-guide-to-structure-retrieval-and-evolution-6f91637ad078)  
-47. The psychology behind shapes and colors | by Rob Postema \- UX Collective, acessado em março 4, 2026, [https://uxdesign.cc/the-psychology-behind-shapes-and-colors-17dd93ce08a2](https://uxdesign.cc/the-psychology-behind-shapes-and-colors-17dd93ce08a2)  
-48. The Therapeutic Canvas: How Colors, Shapes, and Patterns Reshape Emotional Wellness, acessado em março 4, 2026, [https://texaspsychiatrygroup.com/blog/therapeutic-canvas-emotional-wellness/](https://texaspsychiatrygroup.com/blog/therapeutic-canvas-emotional-wellness/)  
-49. Psychology of Shapes: How Shapes Affect Graphic Design \- Piktochart, acessado em março 4, 2026, [https://piktochart.com/blog/psychology-of-shapes/](https://piktochart.com/blog/psychology-of-shapes/)  
-50. Chapter 7\. Adaptive Tessellation of Subdivision Surfaces with Displacement Mapping, acessado em março 4, 2026, [https://developer.nvidia.com/gpugems/gpugems2/part-i-geometric-complexity/chapter-7-adaptive-tessellation-subdivision-surfaces](https://developer.nvidia.com/gpugems/gpugems2/part-i-geometric-complexity/chapter-7-adaptive-tessellation-subdivision-surfaces)  
-51. Shaping Perception: How Visual Forms Influence UX Design \- Tubik Blog, acessado em março 4, 2026, [https://blog.tubikstudio.com/psychology-of-shapes/](https://blog.tubikstudio.com/psychology-of-shapes/)  
-52. (PDF) Procedural Shape Generation for Multi-Dimensional Data Visualization \- ResearchGate, acessado em março 4, 2026, [https://www.researchgate.net/publication/222561750\_Procedural\_Shape\_Generation\_for\_Multi-Dimensional\_Data\_Visualization](https://www.researchgate.net/publication/222561750_Procedural_Shape_Generation_for_Multi-Dimensional_Data_Visualization)  
-53. The Psychology of Design: How Colors and Shapes Affect Perception, acessado em março 4, 2026, [https://mcwilliamsmarketing.com/the-psychology-of-design-how-colors-and-shapes-affect-perception/](https://mcwilliamsmarketing.com/the-psychology-of-design-how-colors-and-shapes-affect-perception/)  
-54. Adding Displacement Mapping to a Material — HOOPS Luminate Documentation, acessado em março 4, 2026, [https://docs.techsoft3d.com/hoops/luminate/tutorials/workflows/wf\_rendering/wf\_displacement.html](https://docs.techsoft3d.com/hoops/luminate/tutorials/workflows/wf_rendering/wf_displacement.html)  
-55. Gemini: Visual Data Art Styles | S Anand, acessado em março 4, 2026, [https://www.s-anand.net/blog/notes/gemini-visual-data-art-styles/](https://www.s-anand.net/blog/notes/gemini-visual-data-art-styles/)  
-56. Learning to Generate 3D Shapes from a Single Example \- ResearchGate, acessado em março 4, 2026, [https://www.researchgate.net/publication/362544271\_Learning\_to\_Generate\_3D\_Shapes\_from\_a\_Single\_Example](https://www.researchgate.net/publication/362544271_Learning_to_Generate_3D_Shapes_from_a_Single_Example)  
-57. Establishing personality from shape AND color preferences \- Psychology Stack Exchange, acessado em março 4, 2026, [https://psychology.stackexchange.com/questions/19510/establishing-personality-from-shape-and-color-preferences](https://psychology.stackexchange.com/questions/19510/establishing-personality-from-shape-and-color-preferences)  
-58. Proc3D: Procedural 3D Generation and Parametric Editing of 3D Shapes with Large Language Models \- ResearchGate, acessado em março 4, 2026, [https://www.researchgate.net/publication/399931325\_Proc3D\_Procedural\_3D\_Generation\_and\_Parametric\_Editing\_of\_3D\_Shapes\_with\_Large\_Language\_Models](https://www.researchgate.net/publication/399931325_Proc3D_Procedural_3D_Generation_and_Parametric_Editing_of_3D_Shapes_with_Large_Language_Models)  
-59. Complex Shapes Are Bluish, Darker, and More Saturated; Shape-Color Correspondence in 3D Object Perception \- Frontiers, acessado em março 4, 2026, [https://www.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2022.854574/full](https://www.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2022.854574/full)  
-60. Color Psychology and Personality Perception: A Study on the Connection Between Clothing Colors and Personality Traits \- ResearchGate, acessado em março 4, 2026, [https://www.researchgate.net/publication/394466391\_Color\_Psychology\_and\_Personality\_Perception\_A\_Study\_on\_the\_Connection\_Between\_Clothing\_Colors\_and\_Personality\_Traits](https://www.researchgate.net/publication/394466391_Color_Psychology_and_Personality_Perception_A_Study_on_the_Connection_Between_Clothing_Colors_and_Personality_Traits)  
-61. Effective Color Psychology in Art: How Colors Shape Emotions and Creativity \- Natha Studio, acessado em março 4, 2026, [https://nathatype.com/color-psychology-in-art-how-colors-shape-emotions-and-creativity/](https://nathatype.com/color-psychology-in-art-how-colors-shape-emotions-and-creativity/)  
-62. (PDF) THE PSYCHOLOGICAL MEANING OF COLOR IN DESIGN: A SEMANTIC REVIEW, acessado em março 4, 2026, [https://www.researchgate.net/publication/391197119\_THE\_PSYCHOLOGICAL\_MEANING\_OF\_COLOR\_IN\_DESIGN\_A\_SEMANTIC\_REVIEW](https://www.researchgate.net/publication/391197119_THE_PSYCHOLOGICAL_MEANING_OF_COLOR_IN_DESIGN_A_SEMANTIC_REVIEW)  
-63. Exploring the relationships between personality and color preferences \- PMC, acessado em março 4, 2026, [https://pmc.ncbi.nlm.nih.gov/articles/PMC9806338/](https://pmc.ncbi.nlm.nih.gov/articles/PMC9806338/)  
-64. Color Preference, Personality Traits and Psychosocial Functioning Among Students of Different Academic Disciplines | Applied Psychology Review \- UMT Journals, acessado em março 4, 2026, [https://journals.umt.edu.pk/index.php/apr/article/view/5784](https://journals.umt.edu.pk/index.php/apr/article/view/5784)  
-65. Mapping Color Associations to Semantic Adjectives in Graphic Design: An Empirical and Computational Approach \- ResearchGate, acessado em março 4, 2026, [https://www.researchgate.net/publication/400216050\_Mapping\_Color\_Associations\_to\_Semantic\_Adjectives\_in\_Graphic\_Design\_An\_Empirical\_and\_Computational\_Approach](https://www.researchgate.net/publication/400216050_Mapping_Color_Associations_to_Semantic_Adjectives_in_Graphic_Design_An_Empirical_and_Computational_Approach)  
-66. Color-Emotion Associations in Art: Fuzzy Approach \- arXiv, acessado em março 4, 2026, [https://arxiv.org/html/2311.18518](https://arxiv.org/html/2311.18518)  
-67. Proc3D: Procedural 3D Generation and Parametric Editing of 3D Shapes with Large Language Models \- arXiv, acessado em março 4, 2026, [https://arxiv.org/html/2601.12234v1](https://arxiv.org/html/2601.12234v1)  
-68. Technical Art in Assemble With Care | by ustwo games | Medium, acessado em março 4, 2026, [https://medium.com/@ustwogames/technical-art-in-assemble-with-care-9b31792add10](https://medium.com/@ustwogames/technical-art-in-assemble-with-care-9b31792add10)  
-69. 16PF: Understanding the 16 Personality Factors, acessado em março 4, 2026, [https://db.arabpsychology.com/16-personality-factors/](https://db.arabpsychology.com/16-personality-factors/)  
-70. 16PF Questionnaire \- Wikipedia, acessado em março 4, 2026, [https://en.wikipedia.org/wiki/16PF\_Questionnaire](https://en.wikipedia.org/wiki/16PF_Questionnaire)  
-71. Reaction-diffusion models in weighted and directed connectomes \- PMC \- NIH, acessado em março 4, 2026, [https://pmc.ncbi.nlm.nih.gov/articles/PMC9683624/](https://pmc.ncbi.nlm.nih.gov/articles/PMC9683624/)  
-72. Psychometric Evaluation of Large Language Model Embeddings for Personality Trait Prediction \- PMC, acessado em março 4, 2026, [https://pmc.ncbi.nlm.nih.gov/articles/PMC12262148/](https://pmc.ncbi.nlm.nih.gov/articles/PMC12262148/)  
-73. Psychometric Evaluation of Large Language Model Embeddings for Personality Trait Prediction \- Journal of Medical Internet Research, acessado em março 4, 2026, [https://www.jmir.org/2025/1/e75347](https://www.jmir.org/2025/1/e75347)  
-74. Marching Cubes: A High Resolution 3D Surface Construction Algorithm \- ResearchGate, acessado em março 4, 2026, [https://www.researchgate.net/publication/202232897\_Marching\_Cubes\_A\_High\_Resolution\_3D\_Surface\_Construction\_Algorithm](https://www.researchgate.net/publication/202232897_Marching_Cubes_A_High_Resolution_3D_Surface_Construction_Algorithm)  
-75. \[2601.12234\] Proc3D: Procedural 3D Generation and Parametric Editing of 3D Shapes with Large Language Models \- arXiv.org, acessado em março 4, 2026, [https://arxiv.org/abs/2601.12234](https://arxiv.org/abs/2601.12234)
+1. Active Learning Machines: What Thousand Brains Theory and Piaget Reveal About True Intelligence \- Greg Robison, acessado em março 4, 2026, [https://gregrobison.medium.com/active-learning-machines-what-thousand-brains-theory-and-piaget-reveal-about-true-intelligence-304b5c9aa82e](https://gregrobison.medium.com/active-learning-machines-what-thousand-brains-theory-and-piaget-reveal-about-true-intelligence-304b5c9aa82e)  
+2. Piaget's Theory and Stages of Cognitive Development \- Simply Psychology, acessado em março 4, 2026, [https://www.simplypsychology.org/piaget.html](https://www.simplypsychology.org/piaget.html)  
+3. The Piaget vs. Erickson Theories Comparison | Psychology Paper Example, acessado em março 4, 2026, [https://psychologywriting.com/the-piaget-vs-erickson-theories-comparison/](https://psychologywriting.com/the-piaget-vs-erickson-theories-comparison/)  
+4. Applying Lessons from Piaget's Developmental Psychology to the AI Era: Building a Happy Modernity \- Medika Life, acessado em março 4, 2026, [https://medika.life/applying-lessons-from-piagets-developmental-psychology-to-the-ai-era-building-a-happy-modernity/](https://medika.life/applying-lessons-from-piagets-developmental-psychology-to-the-ai-era-building-a-happy-modernity/)  
+5. Master of Science in Education Insight: Erikson's 8 Stages of Psychosocial Development, acessado em março 4, 2026, [https://www.waldenu.edu/online-masters-programs/ms-in-education/resource/ms-in-education-insight-eriksons-8-stages-of-development](https://www.waldenu.edu/online-masters-programs/ms-in-education/resource/ms-in-education-insight-eriksons-8-stages-of-development)  
+6. HEXACO model of personality structure \- Wikipedia, acessado em março 4, 2026, [https://en.wikipedia.org/wiki/HEXACO\_model\_of\_personality\_structure](https://en.wikipedia.org/wiki/HEXACO_model_of_personality_structure)  
+7. A Complete Guide To The Hexaco Model of Personality (2026) \- Agility Portal, acessado em março 4, 2026, [https://agilityportal.io/blog/a-complete-guide-to-the-hexaco-model-of-personality-2024](https://agilityportal.io/blog/a-complete-guide-to-the-hexaco-model-of-personality-2024)  
+8. The HEXACO Personality Inventory \- Revised, acessado em março 4, 2026, [https://hexaco.org/](https://hexaco.org/)  
+9. Patterns, Not People: Personality Structures in LLM-powered Persona Agents, acessado em março 4, 2026, [https://cetas.turing.ac.uk/publications/patterns-not-people-personality-structures-llm-powered-persona-agents](https://cetas.turing.ac.uk/publications/patterns-not-people-personality-structures-llm-powered-persona-agents)  
+10. Profile-LLM: Dynamic Profile Optimization for Realistic Personality Expression in LLMs, acessado em março 4, 2026, [https://arxiv.org/html/2511.19852v1](https://arxiv.org/html/2511.19852v1)  
+11. AI Personality based on a Custom GPT \- OpenAI Developer Community, acessado em março 4, 2026, [https://community.openai.com/t/ai-personality-based-on-a-custom-gpt/1085851](https://community.openai.com/t/ai-personality-based-on-a-custom-gpt/1085851)  
+12. MemGPT: Engineering Semantic Memory through Adaptive Retention and Context Summarization \- Information Matters, acessado em março 4, 2026, [https://informationmatters.org/2025/10/memgpt-engineering-semantic-memory-through-adaptive-retention-and-context-summarization/](https://informationmatters.org/2025/10/memgpt-engineering-semantic-memory-through-adaptive-retention-and-context-summarization/)  
+13. How to Build AI Agents with Redis Memory Management, acessado em março 4, 2026, [https://redis.io/blog/build-smarter-ai-agents-manage-short-term-and-long-term-memory-with-redis/](https://redis.io/blog/build-smarter-ai-agents-manage-short-term-and-long-term-memory-with-redis/)  
+14. Beyond Short-term Memory: The 3 Types of Long-term Memory AI Agents Need \- MachineLearningMastery.com, acessado em março 4, 2026, [https://machinelearningmastery.com/beyond-short-term-memory-the-3-types-of-long-term-memory-ai-agents-need/](https://machinelearningmastery.com/beyond-short-term-memory-the-3-types-of-long-term-memory-ai-agents-need/)  
+15. Building an AI Agent Memory Architecture: A Practical Guide to Long-Term Learning, acessado em março 4, 2026, [https://dev.to/oblivionlabz/building-an-ai-agent-memory-architecture-a-practical-guide-to-long-term-learning-46a6](https://dev.to/oblivionlabz/building-an-ai-agent-memory-architecture-a-practical-guide-to-long-term-learning-46a6)  
+16. Principles of Solomonoff Induction and AIXI \- of Marcus Hutter, acessado em março 4, 2026, [http://www.hutter1.net/publ/aixiaxiom2.pdf](http://www.hutter1.net/publ/aixiaxiom2.pdf)  
+17. AIXI \- AI Alignment Forum, acessado em março 4, 2026, [https://www.alignmentforum.org/w/aixi](https://www.alignmentforum.org/w/aixi)  
+18. AIXI Reinforcement Learning Agent \- Emergent Mind, acessado em março 4, 2026, [https://www.emergentmind.com/topics/aixi-reinforcement-learning-agent](https://www.emergentmind.com/topics/aixi-reinforcement-learning-agent)  
+19. Solomonic learning: Large language models and the art of induction \- Amazon Science, acessado em março 4, 2026, [https://www.amazon.science/blog/solomonic-learning-large-language-models-and-the-art-of-induction](https://www.amazon.science/blog/solomonic-learning-large-language-models-and-the-art-of-induction)  
+20. Understanding AI's Essence Through Solomonoff Induction: The Science of Generalization Through Compression, acessado em março 4, 2026, [https://blog.wadan.co.jp/en/tech/solomonoff-induction-compression-generalization](https://blog.wadan.co.jp/en/tech/solomonoff-induction-compression-generalization)  
+21. A Monte-Carlo AIXI Approximation \- Journal of Artificial Intelligence Research, acessado em março 4, 2026, [https://www.jair.org/index.php/jair/article/download/10685/25533/19880](https://www.jair.org/index.php/jair/article/download/10685/25533/19880)  
+22. The Theory of Universal Computation: Bayesian Optimality, Solomonoff Induction & AIXI, acessado em março 4, 2026, [https://angjelinhila.medium.com/the-theory-of-universal-computation-bayesian-optimality-solomonoff-induction-aixi-52d5258a1466](https://angjelinhila.medium.com/the-theory-of-universal-computation-bayesian-optimality-solomonoff-induction-aixi-52d5258a1466)  
+23. Universal Artificial Intelligence \- of Marcus Hutter, acessado em março 4, 2026, [https://www.hutter1.net/ai/uaibook.htm](https://www.hutter1.net/ai/uaibook.htm)  
+24. A Monte-Carlo AIXI Approximation \- ANU College of Engineering & Computer Science, acessado em março 4, 2026, [https://users.cecs.anu.edu.au/\~kee/jair-aixi-ctw.pdf](https://users.cecs.anu.edu.au/~kee/jair-aixi-ctw.pdf)  
+25. LANGUAGE MODELS NEED SLEEP: LEARNING TO ... \- OpenReview, acessado em março 4, 2026, [https://openreview.net/pdf?id=iiZy6xyVVE](https://openreview.net/pdf?id=iiZy6xyVVE)  
+26. Self-Predictive Universal AI \- NeurIPS, acessado em março 4, 2026, [https://proceedings.neurips.cc/paper\_files/paper/2023/file/56a225639da77e8f7c0409f6d5ba996b-Paper-Conference.pdf](https://proceedings.neurips.cc/paper_files/paper/2023/file/56a225639da77e8f7c0409f6d5ba996b-Paper-Conference.pdf)  
+27. Dream Pruning: What Happens When AI Models Sleep | by Gian ..., acessado em março 4, 2026, [https://pub.towardsai.net/dream-pruning-what-happens-when-ai-models-sleep-3db3c404e24a](https://pub.towardsai.net/dream-pruning-what-happens-when-ai-models-sleep-3db3c404e24a)  
+28. Dream2Learn: Structured Generative Dreaming for Continual Learning \- arXiv.org, acessado em março 4, 2026, [https://arxiv.org/html/2603.01935v1](https://arxiv.org/html/2603.01935v1)  
+29. Structured Personality Control and Adaptation for LLM Agents \- arXiv, acessado em março 4, 2026, [https://arxiv.org/html/2601.10025v1](https://arxiv.org/html/2601.10025v1)  
+30. Deterministic AI Agent Personality Expression through Standard Psychological Diagnostics, acessado em março 4, 2026, [https://arxiv.org/html/2503.17085v1](https://arxiv.org/html/2503.17085v1)  
+31. (PDF) Personality and Personal AI Agents A Co-Evolutionary ..., acessado em março 4, 2026, [https://www.researchgate.net/publication/397614373\_Personality\_and\_Personal\_AI\_Agents\_A\_Co-Evolutionary\_Framework](https://www.researchgate.net/publication/397614373_Personality_and_Personal_AI_Agents_A_Co-Evolutionary_Framework)  
+32. UB study reveals how AI models identify personality traits from written texts, acessado em março 4, 2026, [https://web.ub.edu/en/web/actualitat/w/ia-models-personality](https://web.ub.edu/en/web/actualitat/w/ia-models-personality)
+
+[image1]: <data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAsAAAAYCAYAAAAs7gcTAAAAq0lEQVR4Xu3PMQuBQRzH8b9QRD02A5MyeA14Ac8i2WzehWxegsw2g0UZrUZ2ZVKU1WKTxffwuP89PZsy3a8+dfe76/qfiM8/U0IdXVRiZwU0kTWbHEY444GWvffKGEeUdTnFSdyXA2yxQCYqi9hgqUvSww1t1UkDVwxVV8UBE6RULx3cxc6bxwxreY/iRM9rfj//MGsn0bwrhNihj7S6800NF+wxkITXfH7OE6uhGRvQGcr/AAAAAElFTkSuQmCC>
+
+[image2]: <data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAmwAAAAiCAYAAADiWIUQAAACJklEQVR4Xu3cv8tOYRgH8FtR8luUFPWWJKUoUUoGMYkURTFZpChZLIo/QYqB12CXLFIGA6vVIhZZLEyUwY/rcs5xjuN4POV546nPp749132fM7zvdnX/OKUAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAML7zkReRx/X4VeRpXZ+KHKzrvmP9CQAA5saSyOm6vtR9EE70xn2H+hMAAEze5sjuyN7Igs78/MiOut4WuR1ZFNn6441SrnZqAADGsDxyL7Ih8jnysJ6/HLnZSzZk6VpkJrKlVI1bY22dtLC0q2mP6t90v1MDADCGO5GvdZ2rYx8ji9vHv8jVtTyz1njbqXOrtFlN2xfZGLnVPv6uPwYAmDrrI6s649xyXBbZ05mbpMOR53W9PfKhVI3XkHmlWi37FNkUWRH5EtnfeScbtXQxcq5Uf3vXhd4YAGCqzJaqWXtTj7P5yeyMvG9e+oNnkdcjMsqTUt3+/Bt5Ri2bziG5hdpsqwIATK1dkeOlOgP2oP7NXO++NAeOlOpc2iQMbak2/wcAwNTLM2VLS7s9mfL7ZZmZUh3aXx1ZV4YboAORoyMyJFfw8vJByjNqufUJAMBv5A3MlZGTpb0McKO059rulmpb8WyZTGOVDdrL0m6Zvvv5MQAAQ7I5a5qxNZ35vAyQn9HIiwhnOvMAAPwn8rtmV0r7rTMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIB/5hsUkz6leUud9AAAAABJRU5ErkJggg==>
+
+[image3]: <data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACwAAAAYCAYAAACBbx+6AAACmElEQVR4Xu2WS6jNURTGP3FF1PUKRXmEEhMppUyIMkEZEYailImBMLnSzeR2lYiBkoFMTOQxMrhK8hiYkPKoq0QRoozk8X3W2e46q/1/XecM1P3q1+nsdc5/r732t/Z/A2P6fzWeTCfjYqBCvaQnDnZbmrCfbI+BGlpDLsMSr9R68oH8cnwie9xvToT4NTLFxaVDZBDNq5u0m5xHg0pfID/JxhiglpIHsIdOCjFpBXlEFsVAA00m11Fzh+Q7TThM5rWHsIHcIAvDeJIqeqbFaKubtIPcQw1rLCcfyU2MVFANdJCchK2+SFrgc+R3pqkWk5dkXQxE7YJ583Dru/x5Fubjqqop0VdkfhjX/2aSlWQbmdEexixYs/nna97b5Kgby+o0+Q5b2TLymNxHja2BLXKITA3j08gp8oW8g1UvaQK5AksuNu8l2IlRWKjk39fkAOxBSlYNuNn9rkia4CosiSjZSzYbQvuC1JxvSJ8bSyoqwF8l//4gx2DHiswviyj5XCJeSljkJH8Pw85nLyX1liwJ45JiKqAKmVXy7xGMbMMc8ox8hnmwTGUJy98qxFY3tgp2zu93Y15KWD2hHLLS+Zv869UHW4g+y1SWsCb3/lXjybfnUPyCKLVE8m9uRaqsKqxKx5iXtjvXPNG/c8kdWAGKkpWKnvdHq8k35JtG3zWuKusNV6R95CnsmPJK/h2A2U5vSr2ECrsfFtMJoVOrTfKWTO/vB+/JzlZ8NnkY4k+QbxIt+gWseb1ksa/kLtmC8qomacc1r/d8x6WzWsegqvivWguzoI69rkqWuYXyV3iVZAfdCkWZbToiNZUuSJtioIFkNzXbghjoljSR7smjmVD+voiaV8tOSo13nEyMgQrtRb1rwJi6ot/zD4DJpWSiIQAAAABJRU5ErkJggg==>
