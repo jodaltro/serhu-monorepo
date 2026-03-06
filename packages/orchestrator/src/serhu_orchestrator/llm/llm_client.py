@@ -211,7 +211,8 @@ class LLMClient(Protocol):
         - ``observations``: list of observation strings.
         - ``reward_signals``: dict mapping patterns to reward values.
         - ``transition_weights``: dict mapping actions to
-          ``[(observation, probability)]`` lists.
+          ``[(observation, probability)]`` lists.  Parsed into a
+          separate ``WorldModel`` by the builder (not stored on spec).
         - ``horizon``: int, maximum look-ahead steps.
         - ``gamma``: float, discount factor.
 

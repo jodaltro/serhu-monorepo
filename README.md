@@ -129,7 +129,7 @@ generated in the Being's language via `i18n.py`.
 | **proto_converter** | `personality/proto_converter.py` | Pydantic ↔ Protobuf bidirectional conversion |
 | **dream_engine** | `sleep/dream_engine.py` | AIXI rollouts against `AixiEnvironment` (reset/step) + SVD dream pruning |
 | **sleep_cycle** | `sleep/sleep_cycle.py` | Full sleep orchestration (environment build → training → semantize → REM → NREM → ledger) |
-| **aixi_environment** | `sleep/aixi_environment.py` | RL-like AIXI environment (EnvironmentSpec, AixiEnvironment, EnvironmentBuilder) |
+| **aixi_environment** | `sleep/aixi_environment.py` | RL-like AIXI environment (EnvironmentSpec, WorldModel, AixiEnvironment, EnvironmentBuilder) |
 
 ## Setup
 
