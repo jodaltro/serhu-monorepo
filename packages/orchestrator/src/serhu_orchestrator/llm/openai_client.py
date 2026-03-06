@@ -23,6 +23,7 @@ from serhu_orchestrator.llm.llm_client import LLMResponse
 logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL = "gpt-5.4"
+VALID_CHAT_ROLES = {"system", "assistant", "user", "function", "tool", "developer"}
 
 
 class OpenAIClient:
@@ -57,8 +58,9 @@ class OpenAIClient:
         """
         api_messages = [{"role": "system", "content": system_prompt}]
         for m in messages:
+            role = self._normalize_role(m.get("role", "user"))
             api_messages.append({
-                "role": m.get("role", "user"),
+                "role": role,
                 "content": m.get("content", ""),
             })
 
@@ -83,6 +85,23 @@ class OpenAIClient:
             model=response.model,
             usage=usage,
         )
+
+    @staticmethod
+    def _normalize_role(role: str) -> str:
+        """Normalize internal roles to OpenAI Chat API compatible roles."""
+        role_map = {
+            "being": "assistant",
+            "assistant": "assistant",
+            "user": "user",
+            "system": "system",
+            "developer": "developer",
+            "tool": "tool",
+            "function": "function",
+        }
+        normalized = role_map.get((role or "").strip().lower(), "user")
+        if normalized in VALID_CHAT_ROLES:
+            return normalized
+        return "user"
 
     # -- LLMClient.analyze_traits -------------------------------------------
 

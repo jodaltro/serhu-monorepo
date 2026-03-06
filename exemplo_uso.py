@@ -22,15 +22,18 @@ def main():
     # 2. Criar ou carregar um Ser com LLM integrado
     print("🌟 Criando um novo Ser com suporte a LLM...")
     
+    existing_being_id = os.environ.get("BEING_ID")  # ou hardcode para teste
+
     orch = Orchestrator(
         qdrant_url=os.environ["QDRANT_URL"],
         qdrant_api_key=os.environ["QDRANT_API_KEY"],
         supabase_url=os.environ["SUPABASE_URL"],
         supabase_key=os.environ["SUPABASE_KEY"],
-        being_name="Estrela",
-        language="pt",  # Idioma padrão do Ser
+        being_id=existing_being_id,   # <<< se não for None, ele carrega do Supabase
+        being_name="Estrela",         # ignorado quando being_id é passado
+        language="pt",                # idem, só vale na criação
         working_memory_size=20,
-        llm_client=llm_client,  # ← Integração da LLM!
+        llm_client=llm_client,
     )
     
     being_id = orch.being_id

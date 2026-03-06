@@ -177,6 +177,26 @@ class TestOpenAIClientChat:
             assert msgs[1]["role"] == "user"
             assert msgs[1]["content"] == "msg"
 
+    def test_chat_normalizes_internal_being_role_to_assistant(self):
+        with patch("serhu_orchestrator.llm.openai_client.OpenAI") as MockOpenAI:
+            mock_instance = MagicMock()
+            mock_instance.chat.completions.create.return_value = _mock_completion("ok")
+            MockOpenAI.return_value = mock_instance
+
+            client = OpenAIClient(api_key="test-key", model="gpt-5.4")
+            client.chat(
+                system_prompt="sys prompt",
+                messages=[
+                    {"role": "user", "content": "msg1"},
+                    {"role": "being", "content": "msg2"},
+                ],
+            )
+
+            call_args = mock_instance.chat.completions.create.call_args
+            msgs = call_args.kwargs["messages"]
+            assert msgs[2]["role"] == "assistant"
+            assert msgs[2]["content"] == "msg2"
+
 
 class TestOpenAIClientAnalyzeTraits:
     def test_analyze_traits_returns_deltas(self):
