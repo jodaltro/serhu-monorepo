@@ -338,8 +338,8 @@ class Orchestrator:
         # Retrieve recent episodes
         episodes = self._relational.get_episodes(self._personality.being_id, limit=100)
 
-        # Run the sleep cycle
-        dream_engine = DreamEngine(seed=seed)
+        # Run the sleep cycle (DreamEngine gets LLM for enhanced rollouts)
+        dream_engine = DreamEngine(seed=seed, llm_client=self._llm)
         cycle = SleepCycle(dream_engine=dream_engine, llm_client=self._llm)
         self._personality, result = cycle.run(
             self._personality,

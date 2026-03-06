@@ -179,6 +179,92 @@ class TestBuildSystemPrompt:
 
 
 # ---------------------------------------------------------------------------
+# Ledger interpretation (LLM-as-DNA-interpreter)
+# ---------------------------------------------------------------------------
+
+
+class TestLedgerInterpretation:
+    """Tests for the personality ledger interpretation feature."""
+
+    def _make_state(self) -> PersonalityState:
+        return PersonalityState(
+            being_id="interpret-test",
+            name="InterpretBeing",
+        )
+
+    def test_neutral_state_shows_baseline_message(self):
+        state = self._make_state()
+        prompt = build_system_prompt(state)
+        assert "<ledger_interpretation>" in prompt
+        assert "near baseline" in prompt
+
+    def test_high_trait_shows_directive(self):
+        state = self._make_state()
+        state.hexaco.sentimentality = 0.9
+        prompt = build_system_prompt(state)
+        assert "<ledger_interpretation>" in prompt
+        assert "HIGH sentimentality (0.90)" in prompt
+        assert "deep empathy" in prompt
+
+    def test_low_trait_shows_directive(self):
+        state = self._make_state()
+        state.hexaco.prudence = 0.2
+        prompt = build_system_prompt(state)
+        assert "LOW prudence (0.20)" in prompt
+        assert "impulsively" in prompt
+
+    def test_threshold_not_exceeded_omitted(self):
+        state = self._make_state()
+        state.hexaco.sincerity = 0.55  # Only 0.05 from baseline, below threshold
+        prompt = build_system_prompt(state)
+        assert "HIGH sincerity" not in prompt
+        assert "LOW sincerity" not in prompt
+
+    def test_schwartz_value_above_threshold(self):
+        state = self._make_state()
+        state.schwartz.universalism_nature = 0.7
+        prompt = build_system_prompt(state)
+        assert "universalism_nature=0.70" in prompt
+        assert "awe" in prompt.lower() or "nature" in prompt.lower()
+
+    def test_schwartz_value_below_threshold_omitted(self):
+        state = self._make_state()
+        state.schwartz.stimulation = 0.1  # Below 0.3 threshold
+        prompt = build_system_prompt(state)
+        # The interpretation section should NOT contain the directive for stimulation
+        assert "Seek novelty" not in prompt
+
+    def test_tci_character_shown_when_developed(self):
+        state = self._make_state()
+        state.tci_character.empathy = 0.6
+        prompt = build_system_prompt(state)
+        assert "empathy=0.60" in prompt
+        assert "Mirror" in prompt or "validate" in prompt
+
+    def test_multiple_salient_traits_all_shown(self):
+        state = self._make_state()
+        state.hexaco.creativity = 0.9
+        state.hexaco.sociability = 0.1
+        state.tci_temperament.exploratory_excitability = 0.85
+        prompt = build_system_prompt(state)
+        assert "HIGH creativity" in prompt
+        assert "LOW sociability" in prompt
+        assert "HIGH exploratory_excitability" in prompt
+
+    def test_interpretation_contains_must_drive_instruction(self):
+        state = self._make_state()
+        state.hexaco.sincerity = 0.9
+        prompt = build_system_prompt(state)
+        assert "MUST drive" in prompt
+
+    def test_prompt_mentions_ledger_interpretation_instruction(self):
+        state = self._make_state()
+        prompt = build_system_prompt(state)
+        assert "<ledger_interpretation>" in prompt
+        assert "follow them" in prompt.lower() or "behavioral directives" in prompt.lower()
+
+
+# ---------------------------------------------------------------------------
 # Erikson conflict syncs on stage transition (PersonalityEngine)
 # ---------------------------------------------------------------------------
 

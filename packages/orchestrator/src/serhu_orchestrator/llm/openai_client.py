@@ -130,10 +130,11 @@ class OpenAIClient:
         episodes: list[dict],
         personality_summary: str,
     ) -> list[str]:
-        """LLM-powered fact extraction during sleep semantization.
+        """LLM-powered episodic → semantic memory transformation.
 
-        Analyses recent episodes to identify recurring themes, emotional
-        patterns, and factual knowledge the Being should remember.
+        Acts as a 'memory manager' that reads conversation logs and
+        transforms them into distilled semantic knowledge: recurring
+        themes, emotional patterns, user beliefs, and relational facts.
         """
         episode_texts = []
         for ep in episodes[-30:]:
@@ -144,16 +145,23 @@ class OpenAIClient:
         episodes_block = "\n".join(episode_texts)
 
         extraction_prompt = (
-            "You are the memory consolidation engine for a synthetic Being.\n"
-            "Analyze the recent conversation episodes and extract semantic facts.\n\n"
+            "You are the MEMORY MANAGER for a synthetic Being.\n"
+            "Your task: transform raw episodic memory (conversation logs) into "
+            "semantic memory (distilled facts, beliefs, and patterns).\n\n"
+            "Analyse the episodes and extract:\n"
+            "1. Recurring themes the user returns to.\n"
+            "2. Emotional patterns (e.g., 'the user feels tired after work').\n"
+            "3. User preferences and values.\n"
+            "4. Relationship dynamics between user and Being.\n"
+            "5. Inferred beliefs about the user's world.\n\n"
             "Rules:\n"
             "- Extract 3-7 concise factual statements.\n"
-            "- Focus on recurring themes, user preferences, and emotional patterns.\n"
-            "- Each fact should be a single sentence.\n"
+            "- Each fact should be a single, actionable sentence.\n"
+            "- Focus on PATTERNS, not individual events.\n"
             "- Return ONLY a JSON array of strings.\n\n"
             f"Being personality summary:\n{personality_summary}\n\n"
             f"Recent episodes:\n{episodes_block}\n\n"
-            "Return the facts as a JSON array:"
+            "Return the semantic facts as a JSON array:"
         )
 
         response = self._client.chat.completions.create(
@@ -205,15 +213,126 @@ class OpenAIClient:
         raw = response.choices[0].message.content or "[]"
         return self._parse_string_list(raw)
 
+    # -- LLMClient.generate_dream_hypotheses --------------------------------
+
+    def generate_dream_hypotheses(
+        self,
+        episodes: list[dict],
+        personality_summary: str,
+        num_hypotheses: int = 10,
+    ) -> list[str]:
+        """Generate dream hypotheses via Solomonoff Induction.
+
+        The LLM identifies algorithmic patterns in the observed episodic
+        data and produces concise explanations/predictions.  This replaces
+        the random hypothesis generation with meaningful pattern discovery.
+        """
+        episode_texts = []
+        for ep in episodes[-20:]:
+            role = ep.get("role", "unknown")
+            content = ep.get("content", "")
+            episode_texts.append(f"[{role}] {content}")
+
+        episodes_block = "\n".join(episode_texts)
+
+        hypothesis_prompt = (
+            "You are a SOLOMONOFF INDUCTION engine for a synthetic Being's dream cycle.\n"
+            "Your task: discover algorithmic patterns in the observed data and generate\n"
+            "concise hypotheses that explain the user's behavior and the world.\n\n"
+            "A hypothesis is a SIMPLE explanatory pattern, like:\n"
+            "- 'The user seeks emotional validation when discussing work'\n"
+            "- 'Topics about nature trigger positive emotional states'\n"
+            "- 'The user values honesty over comfort'\n\n"
+            "Prefer SIMPLER hypotheses (Occam's razor / Kolmogorov complexity).\n\n"
+            "Rules:\n"
+            f"- Generate exactly {num_hypotheses} hypotheses.\n"
+            "- Each hypothesis should be a single concise sentence.\n"
+            "- Focus on patterns, not individual events.\n"
+            "- Return ONLY a JSON array of strings.\n\n"
+            f"Being personality summary:\n{personality_summary}\n\n"
+            f"Observed episodes:\n{episodes_block}\n\n"
+            "Return the hypotheses as a JSON array:"
+        )
+
+        response = self._client.chat.completions.create(
+            model=self._model,
+            messages=[{"role": "user", "content": hypothesis_prompt}],
+            temperature=0.5,
+            max_completion_tokens=512,
+        )
+
+        raw = response.choices[0].message.content or "[]"
+        return self._parse_string_list(raw)
+
+    # -- LLMClient.simulate_dream_rollouts ----------------------------------
+
+    def simulate_dream_rollouts(
+        self,
+        hypotheses: list[str],
+        personality_summary: str,
+        recent_context: list[str],
+    ) -> list[dict]:
+        """Simulate future conversations to test personality coherence.
+
+        The LLM projects how the Being would react to each hypothesis,
+        scoring each for coherence with the consolidated personality.
+        Returns scored simulations as dicts with action, reward, complexity.
+        """
+        hypotheses_block = "\n".join(f"- {h}" for h in hypotheses[:10])
+        context_block = "\n".join(recent_context[-5:])
+
+        simulation_prompt = (
+            "You are the DREAM SIMULATOR for a synthetic Being.\n"
+            "For each hypothesis, simulate how the Being would react in a future\n"
+            "conversation.  Score each for coherence with the personality.\n\n"
+            "For each hypothesis, return:\n"
+            "- 'action': a brief description of the Being's simulated reaction\n"
+            "- 'reward': coherence score from 0.0 (incoherent) to 1.0 (perfect fit)\n"
+            "- 'complexity': Kolmogorov-like complexity from 0.0 (simple) to 1.0 (complex)\n\n"
+            "Rules:\n"
+            "- Prefer simple hypotheses with high coherence (Occam's razor).\n"
+            "- Return ONLY a JSON array of objects.\n\n"
+            f"Being personality summary:\n{personality_summary}\n\n"
+            f"Recent context:\n{context_block}\n\n"
+            f"Hypotheses to simulate:\n{hypotheses_block}\n\n"
+            "Return the scored simulations as a JSON array:"
+        )
+
+        response = self._client.chat.completions.create(
+            model=self._model,
+            messages=[{"role": "user", "content": simulation_prompt}],
+            temperature=0.3,
+            max_completion_tokens=1024,
+        )
+
+        raw = response.choices[0].message.content or "[]"
+        return self._parse_rollout_results(raw)
+
     # -- internal helpers ---------------------------------------------------
+
+    @staticmethod
+    def _strip_code_fence(raw: str) -> str:
+        """Remove markdown code fences from LLM output."""
+        import re
+        cleaned = raw.strip()
+        # Handle ```json\n...\n``` and ```\n...\n``` and ```json[...]```
+        match = re.match(r"^```(?:json)?\s*\n?(.*?)```\s*$", cleaned, re.DOTALL)
+        if match:
+            return match.group(1).strip()
+        return cleaned
+
+    @staticmethod
+    def _clamp_score(
+        value: float, min_val: float = 0.0, max_val: float = 1.0
+    ) -> float:
+        """Clamp a numeric score to the given bounds."""
+        return max(min_val, min(max_val, float(value)))
 
     @staticmethod
     def _parse_trait_deltas(raw: str) -> dict[str, dict[str, float]]:
         """Parse trait deltas from LLM JSON output with graceful fallback."""
         try:
-            cleaned = raw.strip()
-            if cleaned.startswith("```"):
-                cleaned = cleaned.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+            cleaned = OpenAIClient._strip_code_fence(raw)
             data = json.loads(cleaned)
             if not isinstance(data, dict):
                 return {}
@@ -225,7 +344,9 @@ class OpenAIClient:
                 parsed_traits: dict[str, float] = {}
                 for trait_name, value in traits.items():
                     if isinstance(value, (int, float)):
-                        clamped = max(-0.05, min(0.05, float(value)))
+                        clamped = OpenAIClient._clamp_score(
+                            value, min_val=-0.05, max_val=0.05
+                        )
                         parsed_traits[trait_name] = clamped
                 if parsed_traits:
                     result[model_key] = parsed_traits
@@ -238,13 +359,43 @@ class OpenAIClient:
     def _parse_string_list(raw: str) -> list[str]:
         """Parse a JSON string list from LLM output with graceful fallback."""
         try:
-            cleaned = raw.strip()
-            if cleaned.startswith("```"):
-                cleaned = cleaned.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+            cleaned = OpenAIClient._strip_code_fence(raw)
             data = json.loads(cleaned)
             if isinstance(data, list):
                 return [str(item) for item in data if item]
             return []
         except (json.JSONDecodeError, ValueError):
             logger.warning("Failed to parse string list from LLM response: %s", raw[:200])
+            return []
+
+    @staticmethod
+    def _parse_rollout_results(raw: str) -> list[dict]:
+        """Parse dream rollout results from LLM JSON output."""
+        try:
+            cleaned = OpenAIClient._strip_code_fence(raw)
+            data = json.loads(cleaned)
+            if not isinstance(data, list):
+                return []
+            results: list[dict] = []
+            for item in data:
+                if not isinstance(item, dict):
+                    continue
+                action = str(item.get("action", ""))
+                reward = OpenAIClient._clamp_score(
+                    float(item.get("reward", 0.0))
+                )
+                complexity = OpenAIClient._clamp_score(
+                    float(item.get("complexity", 0.0))
+                )
+                if action:
+                    results.append({
+                        "action": action,
+                        "reward": reward,
+                        "complexity": complexity,
+                    })
+            return results
+        except (json.JSONDecodeError, ValueError, TypeError):
+            logger.warning(
+                "Failed to parse rollout results from LLM response: %s", raw[:200]
+            )
             return []

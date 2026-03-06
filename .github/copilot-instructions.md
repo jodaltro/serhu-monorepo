@@ -249,7 +249,7 @@ O módulo `llm/` implementa o padrão **Protocol** (tipagem estrutural) para per
 
 | Arquivo | Responsabilidade |
 | :---- | :---- |
-| `llm/llm_client.py` | Protocolo abstrato `LLMClient` com 4 métodos: `chat`, `analyze_traits`, `extract_semantic_facts`, `derive_beliefs` |
+| `llm/llm_client.py` | Protocolo abstrato `LLMClient` com 6 métodos: `chat`, `analyze_traits`, `extract_semantic_facts`, `derive_beliefs`, `generate_dream_hypotheses`, `simulate_dream_rollouts` |
 | `llm/openai_client.py` | Implementação concreta `OpenAIClient` usando GPT-5.4 via SDK OpenAI |
 | `llm/__init__.py` | Exporta `LLMClient`, `LLMResponse`, `OpenAIClient` |
 
@@ -259,6 +259,7 @@ Durante a fase de vigília, o GPT-5.4 é utilizado em dois fluxos:
 
 1. **Geração de Respostas (`Orchestrator.chat()`):**
    - Constrói o system prompt com persona-tags (HEXACO, TCI-R, Schwartz, Piaget, Erikson).
+   - Inclui a **seção `<ledger_interpretation>`** que traduz scores salientes em diretivas comportamentais explícitas (ex: "HIGH sentimentality (0.90): Express deep empathy; use emotional vocabulary").
    - Envia o histórico de conversação da working memory ao GPT-5.4.
    - O modelo responde assumindo a voz, limitações cognitivas e vieses emocionais do Ser.
    - A resposta é armazenada na memória como mensagem do Ser.
@@ -271,17 +272,43 @@ Durante a fase de vigília, o GPT-5.4 é utilizado em dois fluxos:
 
 ### **Integração no Sono (Sleep)**
 
-O ciclo de sono é enriquecido pelo GPT-5.4 em duas fases:
+O ciclo de sono é enriquecido pelo GPT-5.4 em três fases:
 
 1. **Semantização Enriquecida (`SleepCycle._semantize()`):**
-   - O GPT-5.4 analisa os episódios recentes e extrai **fatos semânticos ricos**: temas recorrentes, preferências do usuário e padrões emocionais.
-   - Substitui a análise rule-based de frequência de palavras com compreensão contextual profunda.
+   - O GPT-5.4 atua como **MEMORY MANAGER**, transformando memória episódica (logs de conversa) em memória semântica (fatos destilados, padrões e crenças).
+   - Identifica: temas recorrentes, padrões emocionais, preferências do usuário, dinâmicas relacionais e crenças inferidas.
    - Em caso de falha da API, o sistema **cai automaticamente para o método rule-based** original.
 
-2. **Derivação de Crenças Junguiana (`SleepCycle._extract_beliefs()`):**
+2. **Sonhos AIXI com Indução de Solomonoff (`DreamEngine` com LLM):**
+   - O GPT-5.4 atua como **motor de Indução de Solomonoff**, gerando hipóteses algorítmicas simples que explicam padrões nos dados observados.
+   - O LLM projeta **conversas futuras ("sonhos")** para testar como a personalidade consolidada reagiria a diferentes estímulos.
+   - Cada hipótese é pontuada por coerência (reward) e complexidade (Kolmogorov), preferindo explicações simples (Navalha de Ockham).
+   - Em caso de falha, rollouts aleatórios Monte-Carlo são usados como fallback.
+
+3. **Derivação de Crenças Junguiana (`SleepCycle._extract_beliefs()`):**
    - O GPT-5.4 atua como o **Observador Junguiano**, analisando as hipóteses geradas pelos rollouts AIXI.
    - Avalia quais padrões oníricos devem se tornar crenças permanentes versus adaptações transitórias.
    - Em caso de falha, o fallback rule-based gera crenças no formato `"Learned: {action} (confidence={reward})"`.
+
+### **LLM como Intérprete do DNA (Ledger de Personalidade)**
+
+O "Ledger de Personalidade" (o JSON com os scores HEXACO/TCI-R/Schwartz) é apenas um conjunto de números. O LLM é o **único componente** capaz de ler esses números e entender que:
+- Um score de $0.9$ em "Sentimentalismo" deve alterar a escolha de adjetivos e a empatia.
+- Um score de $0.2$ em "Prudência" deve gerar respostas impulsivas.
+- Um valor alto em "Universalismo-Natureza" deve produzir expressões de admiração pela natureza.
+
+A seção `<ledger_interpretation>` no prompt traduz scores salientes (desvio > 0.15 da baseline) em **diretivas comportamentais explícitas** que o LLM deve seguir. Apenas traços significativos são incluídos para manter o prompt focado.
+
+**Exemplo de interpretação gerada:**
+```xml
+<ledger_interpretation>
+  Your Personality Ledger encodes WHO you are. These scores MUST drive your tone:
+  HIGH sentimentality (0.90): Express deep empathy; use emotional vocabulary
+  LOW prudence (0.20): Act impulsively; speak freely
+  HIGH exploratory_excitability (0.85): Eagerly explore new topics
+  universalism_nature=0.70: Express awe and concern for nature
+</ledger_interpretation>
+```
 
 ### **Backward Compatibility e Fallback**
 
@@ -333,8 +360,8 @@ result = orch.sleep(num_rollouts=1000, svd_rank=8)
 ```
 Orchestrator.chat(user_message)
   → MemoryManager.add_interaction("user", message)
-  → build_system_prompt(personality)  # XML com HEXACO/TCI/Schwartz/Piaget
-  → OpenAIClient.chat(system_prompt, messages)  # GPT-5.4 gera resposta
+  → build_system_prompt(personality)  # XML com HEXACO/TCI/Schwartz/Piaget + <ledger_interpretation>
+  → OpenAIClient.chat(system_prompt, messages)  # GPT-5.4 gera resposta com diretivas comportamentais
   → MemoryManager.add_interaction("being", response)
   → OpenAIClient.analyze_traits(prompt, user_msg, being_resp)  # Extrai deltas
   → PersonalityEngine.update_traits(state, deltas)  # Aplica evolução
@@ -342,12 +369,15 @@ Orchestrator.chat(user_message)
 Orchestrator.sleep()
   → SleepCycle.run(state, episodes, llm_client=llm)
     → _semantize(episodes, state)
-      → OpenAIClient.extract_semantic_facts(episodes, summary)  # GPT-5.4
+      → OpenAIClient.extract_semantic_facts(episodes, summary)  # Memory Manager (episódica → semântica)
       → fallback: _rule_based_semantize(episodes)
-    → DreamEngine.perform_dream_rollouts(...)  # AIXI rollouts (inalterado)
+    → DreamEngine.perform_dream_rollouts(history, personality, llm_client=llm)
+      → OpenAIClient.generate_dream_hypotheses(episodes, summary)  # Indução de Solomonoff
+      → OpenAIClient.simulate_dream_rollouts(hypotheses, summary)  # Simulação de sonhos
+      → fallback: _random_rollouts(history, personality)  # Monte-Carlo aleatório
     → DreamEngine.dream_pruning(...)  # SVD consolidation (inalterado)
     → _extract_beliefs(hypotheses, state)
-      → OpenAIClient.derive_beliefs(hypotheses, summary)  # GPT-5.4
+      → OpenAIClient.derive_beliefs(hypotheses, summary)  # Observador Junguiano
       → fallback: _rule_based_extract_beliefs(hypotheses)
 ```
 

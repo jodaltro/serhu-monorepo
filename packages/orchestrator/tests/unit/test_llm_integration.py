@@ -46,6 +46,8 @@ class TestLLMClientProtocol:
         mock.analyze_traits = MagicMock(return_value={})
         mock.extract_semantic_facts = MagicMock(return_value=[])
         mock.derive_beliefs = MagicMock(return_value=[])
+        mock.generate_dream_hypotheses = MagicMock(return_value=[])
+        mock.simulate_dream_rollouts = MagicMock(return_value=[])
         assert isinstance(mock, LLMClient)
 
 
@@ -330,8 +332,16 @@ class TestSleepCycleWithLLM:
 
     def test_full_cycle_with_llm(self):
         llm_mock = self._make_llm_mock()
+        llm_mock.generate_dream_hypotheses = MagicMock(return_value=[
+            "Stars are emotionally significant",
+            "The user values wonder and curiosity",
+        ])
+        llm_mock.simulate_dream_rollouts = MagicMock(return_value=[
+            {"action": "Stars are emotionally significant", "reward": 0.8, "complexity": 0.2},
+            {"action": "The user values wonder and curiosity", "reward": 0.7, "complexity": 0.3},
+        ])
         cycle = SleepCycle(
-            dream_engine=DreamEngine(seed=42),
+            dream_engine=DreamEngine(seed=42, llm_client=llm_mock),
             llm_client=llm_mock,
         )
 
@@ -488,6 +498,14 @@ class TestOrchestratorChat:
         llm_mock = MagicMock()
         llm_mock.extract_semantic_facts.return_value = ["User loves nature"]
         llm_mock.derive_beliefs.return_value = ["Nature is healing"]
+        llm_mock.generate_dream_hypotheses.return_value = [
+            "The user finds peace in nature",
+            "Nature imagery triggers positive emotions",
+        ]
+        llm_mock.simulate_dream_rollouts.return_value = [
+            {"action": "The user finds peace in nature", "reward": 0.8, "complexity": 0.2},
+            {"action": "Nature imagery triggers positive emotions", "reward": 0.7, "complexity": 0.3},
+        ]
 
         with (
             patch("serhu_orchestrator.orchestrator.ArchivalMemory", InMemoryArchival),
@@ -510,3 +528,212 @@ class TestOrchestratorChat:
 
             assert "User loves nature" in result.facts_extracted
             assert "Nature is healing" in result.beliefs_added
+
+
+# ---------------------------------------------------------------------------
+# DreamEngine with LLM
+# ---------------------------------------------------------------------------
+
+
+class TestDreamEngineWithLLM:
+    """Tests for LLM-enhanced dream rollouts."""
+
+    def _make_llm_mock(self) -> MagicMock:
+        llm = MagicMock()
+        llm.generate_dream_hypotheses.return_value = [
+            "The user values honesty above comfort",
+            "Conversations about nature improve mood",
+            "The user seeks emotional validation",
+        ]
+        llm.simulate_dream_rollouts.return_value = [
+            {"action": "The user values honesty above comfort", "reward": 0.9, "complexity": 0.1},
+            {"action": "Conversations about nature improve mood", "reward": 0.7, "complexity": 0.2},
+            {"action": "The user seeks emotional validation", "reward": 0.6, "complexity": 0.3},
+        ]
+        return llm
+
+    def test_llm_hypotheses_generated(self):
+        llm_mock = self._make_llm_mock()
+        engine = DreamEngine(seed=42, llm_client=llm_mock)
+
+        history = [{"content": "I love honesty"}]
+        personality = [0.5] * 72
+        results = engine.perform_dream_rollouts(
+            history, personality, num_rollouts=50, top_k=5,
+            personality_summary="Name: Test, Stage: sensorimotor",
+        )
+
+        llm_mock.generate_dream_hypotheses.assert_called_once()
+        llm_mock.simulate_dream_rollouts.assert_called_once()
+        assert len(results) == 5
+        # LLM hypotheses should be in the results
+        actions = [h.action for h in results]
+        assert any("honesty" in a for a in actions)
+
+    def test_llm_fallback_on_error(self):
+        llm_mock = MagicMock()
+        llm_mock.generate_dream_hypotheses.side_effect = Exception("API error")
+        engine = DreamEngine(seed=42, llm_client=llm_mock)
+
+        history = [{"content": "test content"}]
+        personality = [0.5] * 72
+        results = engine.perform_dream_rollouts(
+            history, personality, num_rollouts=50, top_k=5,
+        )
+
+        # Should fall back to random rollouts
+        assert len(results) == 5
+        for h in results:
+            assert isinstance(h, Hypothesis)
+
+    def test_llm_empty_hypotheses_falls_back(self):
+        llm_mock = MagicMock()
+        llm_mock.generate_dream_hypotheses.return_value = []
+        engine = DreamEngine(seed=42, llm_client=llm_mock)
+
+        history = [{"content": "test"}]
+        personality = [0.5] * 72
+        results = engine.perform_dream_rollouts(
+            history, personality, num_rollouts=50, top_k=5,
+        )
+
+        # Should use random rollouts since LLM returned nothing
+        assert len(results) == 5
+
+    def test_no_llm_uses_random_only(self):
+        engine = DreamEngine(seed=42)
+
+        history = [{"content": "test"}]
+        personality = [0.5] * 72
+        results = engine.perform_dream_rollouts(
+            history, personality, num_rollouts=50, top_k=5,
+        )
+
+        assert len(results) == 5
+        for h in results:
+            assert isinstance(h, Hypothesis)
+
+    def test_llm_results_sorted_by_reward(self):
+        llm_mock = self._make_llm_mock()
+        engine = DreamEngine(seed=42, llm_client=llm_mock)
+
+        history = [{"content": "test"}]
+        personality = [0.5] * 72
+        results = engine.perform_dream_rollouts(
+            history, personality, num_rollouts=100, top_k=10,
+            personality_summary="Name: Test",
+        )
+
+        # Results should be sorted by reward descending
+        for i in range(len(results) - 1):
+            assert results[i].reward >= results[i + 1].reward
+
+
+# ---------------------------------------------------------------------------
+# OpenAIClient – new methods
+# ---------------------------------------------------------------------------
+
+
+class TestOpenAIClientDreamHypotheses:
+    """Tests for generate_dream_hypotheses."""
+
+    def test_generate_dream_hypotheses(self):
+        with patch("serhu_orchestrator.llm.openai_client.OpenAI") as MockOpenAI:
+            mock_instance = MagicMock()
+            mock_instance.chat.completions.create.return_value = _mock_completion(
+                json.dumps([
+                    "The user values honesty",
+                    "Nature triggers positive emotions",
+                ])
+            )
+            MockOpenAI.return_value = mock_instance
+
+            client = OpenAIClient(api_key="test-key")
+            hypotheses = client.generate_dream_hypotheses(
+                episodes=[{"role": "user", "content": "I love honesty"}],
+                personality_summary="Name: Test",
+                num_hypotheses=5,
+            )
+
+            assert len(hypotheses) == 2
+            assert "honesty" in hypotheses[0]
+
+    def test_generate_dream_hypotheses_empty(self):
+        with patch("serhu_orchestrator.llm.openai_client.OpenAI") as MockOpenAI:
+            mock_instance = MagicMock()
+            mock_instance.chat.completions.create.return_value = _mock_completion("[]")
+            MockOpenAI.return_value = mock_instance
+
+            client = OpenAIClient(api_key="test-key")
+            hypotheses = client.generate_dream_hypotheses(
+                episodes=[], personality_summary="Test",
+            )
+            assert hypotheses == []
+
+
+class TestOpenAIClientDreamRollouts:
+    """Tests for simulate_dream_rollouts."""
+
+    def test_simulate_dream_rollouts(self):
+        with patch("serhu_orchestrator.llm.openai_client.OpenAI") as MockOpenAI:
+            mock_instance = MagicMock()
+            mock_instance.chat.completions.create.return_value = _mock_completion(
+                json.dumps([
+                    {"action": "express empathy", "reward": 0.8, "complexity": 0.2},
+                    {"action": "ask about feelings", "reward": 0.6, "complexity": 0.3},
+                ])
+            )
+            MockOpenAI.return_value = mock_instance
+
+            client = OpenAIClient(api_key="test-key")
+            results = client.simulate_dream_rollouts(
+                hypotheses=["hypothesis1"],
+                personality_summary="Name: Test",
+                recent_context=["conversation"],
+            )
+
+            assert len(results) == 2
+            assert results[0]["action"] == "express empathy"
+            assert results[0]["reward"] == 0.8
+
+    def test_simulate_dream_rollouts_clamps_values(self):
+        with patch("serhu_orchestrator.llm.openai_client.OpenAI") as MockOpenAI:
+            mock_instance = MagicMock()
+            mock_instance.chat.completions.create.return_value = _mock_completion(
+                json.dumps([
+                    {"action": "test", "reward": 1.5, "complexity": -0.5},
+                ])
+            )
+            MockOpenAI.return_value = mock_instance
+
+            client = OpenAIClient(api_key="test-key")
+            results = client.simulate_dream_rollouts(
+                hypotheses=["h1"],
+                personality_summary="Test",
+                recent_context=[],
+            )
+
+            assert results[0]["reward"] == 1.0  # clamped
+            assert results[0]["complexity"] == 0.0  # clamped
+
+    def test_simulate_dream_rollouts_invalid_json(self):
+        with patch("serhu_orchestrator.llm.openai_client.OpenAI") as MockOpenAI:
+            mock_instance = MagicMock()
+            mock_instance.chat.completions.create.return_value = _mock_completion(
+                "not valid json"
+            )
+            MockOpenAI.return_value = mock_instance
+
+            client = OpenAIClient(api_key="test-key")
+            results = client.simulate_dream_rollouts(
+                hypotheses=["h1"],
+                personality_summary="Test",
+                recent_context=[],
+            )
+            assert results == []
+
+    def test_parse_rollout_results_strips_code_fence(self):
+        raw = '```json\n[{"action": "a", "reward": 0.5, "complexity": 0.1}]\n```'
+        results = OpenAIClient._parse_rollout_results(raw)
+        assert len(results) == 1
+        assert results[0]["action"] == "a"

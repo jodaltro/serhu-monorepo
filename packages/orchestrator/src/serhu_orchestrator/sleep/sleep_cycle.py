@@ -119,6 +119,7 @@ class SleepCycle:
             history=episodes,
             personality_vector=personality_vector,
             num_rollouts=num_rollouts,
+            personality_summary=self._build_personality_summary(state),
         )
 
         # Phase 3: Consolidation (NREM) – SVD dream pruning
