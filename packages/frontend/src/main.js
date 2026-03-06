@@ -125,7 +125,7 @@ async function startScene(info) {
   });
 
   // Initialise sleep button
-  initSleepButton();
+  initSleepButton(info.is_sleeping);
 
   // Copy-ID button
   const copyBtn = document.getElementById("copy-id-btn");
@@ -164,9 +164,15 @@ async function refreshVisualState() {
 
 // -- Sleep button ----------------------------------------------------------
 
-function initSleepButton() {
+function initSleepButton(initialSleeping = false) {
   const btn = document.getElementById("sleep-btn");
   if (!btn) return;
+
+  let isSleeping = initialSleeping;
+  if (isSleeping) {
+    btn.classList.add("sleeping");
+    btn.title = "Wake up the Being";
+  }
 
   // Create toast element
   const toast = document.createElement("div");
@@ -182,28 +188,43 @@ function initSleepButton() {
   btn.addEventListener("click", async () => {
     if (!beingId) return;
     btn.disabled = true;
-    btn.classList.add("sleeping");
-    btn.title = "Sleeping…";
 
-    try {
-      // Twilight: consolidate working memory first
-      await api.consolidate(beingId);
+    if (!isSleeping) {
+      // Awake → Sleep: consolidate + start continuous AIXI dreaming
+      btn.classList.add("sleeping");
+      btn.title = "Starting sleep…";
 
-      // Sleep: NREM + REM cycle
-      const result = await api.sleep(beingId, { num_rollouts: 500, svd_rank: 8 });
+      try {
+        await api.consolidate(beingId);
+        await api.sleep(beingId, { num_rollouts: 500, svd_rank: 8 });
+        isSleeping = true;
+        showToast("💤 Being is now dreaming… (AIXI running continuously)");
+        btn.title = "Wake up the Being";
+      } catch (err) {
+        showToast(`⚠ Sleep failed: ${err.message}`);
+        btn.classList.remove("sleeping");
+      }
+    } else {
+      // Sleeping → Wake: stop AIXI and retrieve results
+      btn.title = "Waking up…";
 
-      showToast(
-        `💤 Sleep done · ${result.facts_extracted} facts · ${result.beliefs_added} beliefs · ${result.hypotheses_generated} dreams`
-      );
+      try {
+        const result = await api.wake(beingId);
+        isSleeping = false;
+        btn.classList.remove("sleeping");
 
-      // Refresh visual state — personality evolved during sleep
-      await refreshVisualState();
-    } catch (err) {
-      showToast(`⚠ Sleep failed: ${err.message}`);
-    } finally {
-      btn.disabled = false;
-      btn.classList.remove("sleeping");
-      btn.title = "Trigger sleep cycle (consolidate + dream)";
+        showToast(
+          `☀ Awake · ${result.cycles_completed} cycles · ${result.facts_extracted} facts · ${result.beliefs_added} beliefs`
+        );
+
+        // Refresh visual state — personality evolved during sleep
+        await refreshVisualState();
+        btn.title = "Put the Being to sleep (consolidate + dream)";
+      } catch (err) {
+        showToast(`⚠ Wake failed: ${err.message}`);
+      }
     }
+
+    btn.disabled = false;
   });
 }

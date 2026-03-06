@@ -146,8 +146,9 @@ class TestSleep:
                 json={"role": "user", "content": f"Message {i}"},
             )
 
+        # Use sleep-once for backward-compatible single-shot sleep
         resp = client.post(
-            f"/beings/{being_id}/sleep",
+            f"/beings/{being_id}/sleep-once",
             json={"num_rollouts": 50, "svd_rank": 4, "seed": 42},
         )
         assert resp.status_code == 200
@@ -155,6 +156,56 @@ class TestSleep:
         assert "facts_extracted" in data
         assert "beliefs_added" in data
         assert "hypotheses_generated" in data
+
+    def test_sleep_and_wake(self, client):
+        create_resp = client.post("/beings", json={"name": "Luna"})
+        being_id = create_resp.json()["being_id"]
+
+        # Add some episodes
+        for i in range(5):
+            client.post(
+                f"/beings/{being_id}/process",
+                json={"role": "user", "content": f"Message {i}"},
+            )
+
+        # Start continuous sleep
+        resp = client.post(
+            f"/beings/{being_id}/sleep",
+            json={"num_rollouts": 50, "svd_rank": 4, "seed": 42},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["is_sleeping"] is True
+
+        # Check the being is sleeping
+        being = client.get(f"/beings/{being_id}").json()
+        assert being["is_sleeping"] is True
+
+        # Wake the being
+        resp = client.post(f"/beings/{being_id}/wake", json={"timeout": 10.0})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "cycles_completed" in data
+        assert data["cycles_completed"] >= 1
+
+    def test_sleep_while_already_sleeping_returns_409(self, client):
+        create_resp = client.post("/beings", json={"name": "Luna"})
+        being_id = create_resp.json()["being_id"]
+
+        # Start continuous sleep
+        client.post(
+            f"/beings/{being_id}/sleep",
+            json={"num_rollouts": 50, "svd_rank": 4, "seed": 42},
+        )
+
+        # Second sleep attempt should fail
+        resp = client.post(
+            f"/beings/{being_id}/sleep",
+            json={"num_rollouts": 50, "svd_rank": 4, "seed": 42},
+        )
+        assert resp.status_code == 409
+
+        # Cleanup: wake up the being
+        client.post(f"/beings/{being_id}/wake", json={"timeout": 10.0})
 
 
 class TestRecall:

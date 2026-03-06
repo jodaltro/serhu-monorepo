@@ -6,6 +6,15 @@ Implements a state-machine-like sleep cycle inspired by AWS Step Functions:
 3. **Consolidation (NREM)** – SVD dream pruning of personality vectors.
 4. **Ledger Update**  – Persist evolved personality and beliefs.
 
+The sleep cycle supports two execution modes:
+
+- **Single-shot** (``run``): Executes one complete cycle and returns.
+- **Continuous** (``run_continuous``): Runs AIXI rollouts indefinitely,
+  as AIXI should be, until ``request_stop()`` is called (e.g. when the
+  user wants to interact again).  Each iteration performs a full
+  dream cycle, accumulating hypotheses, beliefs, and personality
+  refinements across iterations.
+
 When an ``LLMClient`` is provided (e.g. ``OpenAIClient`` for GPT-5.4),
 phases 1 and 4 are enhanced with LLM-powered analysis.  Without an LLM
 client the original rule-based logic is used as fallback.
@@ -21,6 +30,7 @@ References:
 from __future__ import annotations
 
 import logging
+import threading
 from dataclasses import dataclass, field
 
 from serhu_orchestrator.personality.types import PersonalityState
@@ -45,6 +55,9 @@ class SleepResult:
         Personality vector before consolidation.
     traits_after : list[float]
         Personality vector after SVD pruning.
+    cycles_completed : int
+        Number of AIXI dream cycles completed (≥1 for single-shot,
+        potentially many for continuous mode).
     """
 
     facts_extracted: list[str] = field(default_factory=list)
@@ -52,10 +65,20 @@ class SleepResult:
     beliefs_added: list[str] = field(default_factory=list)
     traits_before: list[float] = field(default_factory=list)
     traits_after: list[float] = field(default_factory=list)
+    cycles_completed: int = 0
 
 
 class SleepCycle:
     """Coordinates the Being's offline sleep processing.
+
+    Supports two execution modes:
+
+    - **Single-shot** (``run``): One complete semantization → dream →
+      consolidation → belief cycle.
+    - **Continuous** (``run_continuous``): Loops indefinitely, running
+      AIXI rollouts in every iteration, until ``request_stop()`` is
+      called.  This models the AIXI ideal of an agent that never stops
+      dreaming until external intervention.
 
     Parameters
     ----------
@@ -79,6 +102,16 @@ class SleepCycle:
     ) -> None:
         self.dream_engine = dream_engine or DreamEngine()
         self._llm = llm_client
+        self._stop_event = threading.Event()
+
+    def request_stop(self) -> None:
+        """Signal the continuous sleep loop to stop after the current cycle."""
+        self._stop_event.set()
+
+    @property
+    def stop_requested(self) -> bool:
+        """Whether a stop has been requested."""
+        return self._stop_event.is_set()
 
     def run(
         self,
@@ -88,7 +121,7 @@ class SleepCycle:
         num_rollouts: int = 1000,
         svd_rank: int = 8,
     ) -> tuple[PersonalityState, SleepResult]:
-        """Execute the full sleep cycle.
+        """Execute a single full sleep cycle (backward-compatible).
 
         Parameters
         ----------
@@ -134,6 +167,96 @@ class SleepCycle:
         result.beliefs_added = new_beliefs
         state.core_beliefs.extend(new_beliefs)
 
+        result.cycles_completed = 1
+        return state, result
+
+    def run_continuous(
+        self,
+        state: PersonalityState,
+        episodes: list[dict],
+        *,
+        num_rollouts: int = 1000,
+        svd_rank: int = 8,
+        on_cycle: callable | None = None,
+    ) -> tuple[PersonalityState, SleepResult]:
+        """Run AIXI dream cycles indefinitely until ``request_stop()`` is called.
+
+        Semantization occurs once (first iteration).  Each subsequent
+        iteration runs a fresh set of AIXI rollouts and SVD consolidation
+        on the progressively refined personality vector, accumulating
+        hypotheses and beliefs.
+
+        Parameters
+        ----------
+        state : PersonalityState
+            Current personality state.
+        episodes : list[dict]
+            Recent episodic memory entries.
+        num_rollouts : int
+            Number of AIXI dream rollouts per cycle.
+        svd_rank : int
+            Target rank for SVD dream pruning.
+        on_cycle : callable | None
+            Optional callback ``(cycle_number: int, state: PersonalityState) -> None``
+            invoked after each completed cycle.
+
+        Returns
+        -------
+        tuple[PersonalityState, SleepResult]
+            Updated personality state and accumulated sleep metadata.
+        """
+        result = SleepResult()
+
+        # If already stopped (e.g., wake() called before thread started),
+        # return immediately.
+        if self._stop_event.is_set():
+            return state, result
+
+        # Phase 1 (once): Semantization – extract facts from episodes
+        result.facts_extracted = self._semantize(episodes, state)
+
+        # Record initial traits
+        result.traits_before = list(self._flatten_traits(state))
+
+        cycle = 0
+        while not self._stop_event.is_set():
+            cycle += 1
+            logger.info("Continuous sleep: starting dream cycle %d", cycle)
+
+            # Dream (REM) – AIXI rollouts
+            personality_vector = self._flatten_traits(state)
+            cycle_hypotheses = self.dream_engine.perform_dream_rollouts(
+                history=episodes,
+                personality_vector=personality_vector,
+                num_rollouts=num_rollouts,
+                personality_summary=self._build_personality_summary(state),
+            )
+            result.hypotheses = cycle_hypotheses
+
+            # Consolidation (NREM) – SVD dream pruning
+            consolidated = DreamEngine.dream_pruning(
+                personality_vector, target_rank=svd_rank
+            )
+            result.traits_after = consolidated
+
+            # Ledger update
+            state = self._apply_consolidated_traits(state, consolidated)
+            new_beliefs = self._extract_beliefs(cycle_hypotheses, state)
+            result.beliefs_added.extend(new_beliefs)
+            state.core_beliefs.extend(new_beliefs)
+
+            result.cycles_completed = cycle
+
+            if on_cycle is not None:
+                on_cycle(cycle, state)
+
+            # Check stop after callback (allows callback to request_stop)
+            if self._stop_event.is_set():
+                break
+
+        logger.info(
+            "Continuous sleep ended after %d cycle(s)", result.cycles_completed
+        )
         return state, result
 
     # -- internal phases ----------------------------------------------------
