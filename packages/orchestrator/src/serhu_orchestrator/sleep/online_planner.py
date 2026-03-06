@@ -208,7 +208,8 @@ class OnlinePlanner:
             rollout_indices = list(range(len(candidates)))
 
         # Step 3: Evaluate only selected candidates with mini-rollouts
-        candidate_rewards: list[float] = [0.0] * len(candidates)
+        rollout_set = set(rollout_indices)
+        candidate_rewards: list[float] = [-float("inf")] * len(candidates)
         for i in rollout_indices:
             avg_reward = self._evaluate_candidate(
                 candidate_actions[i], personality_vector,
@@ -220,10 +221,10 @@ class OnlinePlanner:
                 i, candidate_actions[i], avg_reward,
             )
 
-        # For candidates not evaluated, use ValueModel prediction as estimate
+        # For candidates not evaluated via rollouts, use ValueModel prediction
         if value_model is not None and value_model.is_trained:
             for i in range(len(candidates)):
-                if i not in rollout_indices:
+                if i not in rollout_set:
                     candidate_rewards[i] = value_model.predict(
                         personality_vector, candidate_actions[i]
                     )

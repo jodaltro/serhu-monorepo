@@ -104,7 +104,7 @@ class ValueModel:
             if feat not in self.weights:
                 self.weights[feat] = 0.0
 
-        # Mini-batch gradient descent
+        # Batch gradient descent
         n = len(targets)
         for _epoch in range(epochs):
             total_loss = 0.0
@@ -237,5 +237,7 @@ class ValueModel:
 
     def _compute_version(self) -> str:
         """Compute a content-based hash for this model."""
-        content = repr(sorted(self.weights.items())) + repr(self.bias)
+        # Use fixed-precision float format for cross-platform determinism
+        items = sorted(self.weights.items())
+        content = "|".join(f"{k}={v:.10f}" for k, v in items) + f"|b={self.bias:.10f}"
         return hashlib.sha256(content.encode()).hexdigest()[:12]
