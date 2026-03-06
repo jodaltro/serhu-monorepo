@@ -4,9 +4,11 @@ Provides a proper environment interface for the AIXI approximation,
 following the standard RL pattern: ``reset() -> observation`` and
 ``step(action) -> (observation, reward, done, info)``.
 
-The environment is built from an ``EnvironmentSpec`` that can be
-extracted by an LLM at the start of sleep (one-shot) or derived
-from the NeuralEngine's learned patterns (fallback).
+The environment is built from an ``EnvironmentSpec`` (task description)
+and a ``WorldModel`` (trained transition model).  The spec describes
+*what* the environment is (actions, observations, reward rules, limits);
+the ``WorldModel`` describes *how* it transitions between states and is
+versioned separately as a trained artifact.
 
 This decouples the AIXI rollout engine from the data extraction
 mechanism, enabling the LLM to provide rich semantic "inputs"
@@ -20,6 +22,7 @@ References:
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import math
 import random
@@ -32,10 +35,16 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class EnvironmentSpec:
-    """Specification for the AIXI dream environment.
+    """Task specification for the AIXI dream environment.
+
+    Describes the *game* (actions, observations, reward rules, limits)
+    but does **not** carry a transition model.  Instead, it declares
+    which ``world_model_type`` + ``world_model_params`` should be used
+    to derive or load a :class:`WorldModel` separately.
 
     Extracted once at the start of sleep (by LLM or NeuralEngine)
-    and used to build the :class:`AixiEnvironment` for all rollouts.
+    and used together with a :class:`WorldModel` to build the
+    :class:`AixiEnvironment` for all rollouts.
 
     Attributes
     ----------
@@ -48,9 +57,11 @@ class EnvironmentSpec:
     reward_signals : dict[str, float]
         Mapping from action/observation patterns to base reward values.
         Patterns are matched as substrings against action+observation.
-    transition_weights : dict[str, list[tuple[str, float]]]
-        For each action, a list of ``(observation, probability)`` pairs
-        defining the transition model.
+    world_model_type : str
+        Identifier for the type of world model to use.
+        Examples: ``"co_occurrence"``, ``"llm_derived"``, ``"neural"``.
+    world_model_params : dict
+        Parameters passed to the world model builder.
     horizon : int
         Maximum look-ahead steps per rollout episode.
     gamma : float
@@ -60,28 +71,104 @@ class EnvironmentSpec:
     actions: list[str] = field(default_factory=list)
     observations: list[str] = field(default_factory=list)
     reward_signals: dict[str, float] = field(default_factory=dict)
+    world_model_type: str = "co_occurrence"
+    world_model_params: dict = field(default_factory=dict)
+    horizon: int = 10
+    gamma: float = 0.95
+
+
+@dataclass
+class WorldModel:
+    """Versioned transition model for AIXI dream rollouts.
+
+    Separated from :class:`EnvironmentSpec` so that the spec describes
+    the *task* while this class holds the *trained/derived* transition
+    logic.  Each instance carries a content-based ``version`` hash and
+    optional ``metrics`` for tracking model evolution across sleep cycles.
+
+    Attributes
+    ----------
+    model_type : str
+        Algorithm used to derive transitions (e.g. ``"co_occurrence"``).
+    params : dict
+        Configuration parameters used when building this model.
+    transition_weights : dict[str, list[tuple[str, float]]]
+        For each action, a list of ``(observation, probability)`` pairs
+        defining the transition model.
+    version : str
+        Content-based hash for versioning the trained artifact.
+    metrics : dict[str, float]
+        Quality metrics for this model (e.g. entropy, coverage).
+    """
+
+    model_type: str = "co_occurrence"
+    params: dict = field(default_factory=dict)
     transition_weights: dict[str, list[tuple[str, float]]] = field(
         default_factory=dict
     )
-    horizon: int = 10
-    gamma: float = 0.95
+    version: str = ""
+    metrics: dict[str, float] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not self.version and self.transition_weights:
+            self.version = self._compute_version()
+
+    def transition(
+        self, action: str, observations: list[str], rng: random.Random
+    ) -> str:
+        """Determine next observation from the transition model.
+
+        Parameters
+        ----------
+        action : str
+            The action taken by the agent.
+        observations : list[str]
+            Full observation vocabulary (used for fallback).
+        rng : random.Random
+            Random number generator for stochastic transitions.
+
+        Returns
+        -------
+        str
+            The next observation.
+        """
+        if action in self.transition_weights:
+            transitions = self.transition_weights[action]
+            if transitions:
+                obs_list, weight_list = zip(*transitions)
+                return rng.choices(
+                    list(obs_list), weights=list(weight_list), k=1
+                )[0]
+
+        # Fallback: random observation
+        if observations:
+            return rng.choice(observations)
+        return "unknown"
+
+    def _compute_version(self) -> str:
+        """Compute a content-based hash for this model."""
+        content = repr(sorted(self.transition_weights.items()))
+        return hashlib.sha256(content.encode()).hexdigest()[:12]
 
 
 class AixiEnvironment:
     """RL-like environment for AIXI dream rollouts.
 
     Implements ``reset()`` and ``step(action)`` following the standard
-    Gym interface.  The transition model and reward signals come from
-    the ``EnvironmentSpec`` built at sleep start.
+    Gym interface.  The task description comes from an ``EnvironmentSpec``
+    and the transition logic comes from a separate ``WorldModel``.
 
     Parameters
     ----------
     spec : EnvironmentSpec
-        Environment specification (actions, observations, rewards, etc.).
+        Task specification (actions, observations, rewards, limits).
     personality_vector : list[float]
         The Being's personality vector, used for reward modulation.
     seed : int | None
         Random seed for reproducible rollouts.
+    world_model : WorldModel | None
+        Trained transition model.  When *None*, falls back to uniform
+        random transitions over the observation vocabulary.
     """
 
     # Named indices into the 72-dim personality vector
@@ -94,8 +181,10 @@ class AixiEnvironment:
         spec: EnvironmentSpec,
         personality_vector: list[float],
         seed: int | None = None,
+        world_model: WorldModel | None = None,
     ) -> None:
         self.spec = spec
+        self._world_model = world_model
         self._personality = personality_vector
         self._rng = random.Random(seed)
         self._current_obs: str = ""
@@ -125,7 +214,7 @@ class AixiEnvironment:
         """
         self._step_count += 1
 
-        # Transition: determine next observation
+        # Transition: determine next observation via WorldModel
         observation = self._transition(action)
         self._current_obs = observation
 
@@ -143,14 +232,13 @@ class AixiEnvironment:
         return observation, reward, done, info
 
     def _transition(self, action: str) -> str:
-        """Determine next observation from transition model."""
-        if action in self.spec.transition_weights:
-            transitions = self.spec.transition_weights[action]
-            if transitions:
-                obs_list, weight_list = zip(*transitions)
-                return self._rng.choices(list(obs_list), weights=list(weight_list), k=1)[0]
+        """Determine next observation from the WorldModel."""
+        if self._world_model is not None:
+            return self._world_model.transition(
+                action, self.spec.observations, self._rng
+            )
 
-        # Fallback: random observation
+        # No world model: uniform random over observations
         if self.spec.observations:
             return self._rng.choice(self.spec.observations)
         return f"obs_{self._step_count}"
@@ -193,10 +281,13 @@ class AixiEnvironment:
 
 
 class EnvironmentBuilder:
-    """Builds ``EnvironmentSpec`` from LLM analysis or NeuralEngine patterns.
+    """Builds ``EnvironmentSpec`` and ``WorldModel`` from LLM analysis or NeuralEngine patterns.
 
     The LLM path is used when a client is available (one-shot at sleep start).
     The NeuralEngine path is the self-learning fallback.
+
+    All builder methods return a ``(EnvironmentSpec, WorldModel)`` tuple,
+    separating the task description from the trained transition model.
     """
 
     @staticmethod
@@ -205,7 +296,7 @@ class EnvironmentBuilder:
         episodes: list[dict],
         personality_summary: str,
         personality_vector: list[float],
-    ) -> EnvironmentSpec:
+    ) -> tuple[EnvironmentSpec, WorldModel]:
         """Use LLM once to extract AIXI environment inputs.
 
         Parameters
@@ -221,8 +312,8 @@ class EnvironmentBuilder:
 
         Returns
         -------
-        EnvironmentSpec
-            The extracted environment specification.
+        tuple[EnvironmentSpec, WorldModel]
+            The extracted task specification and trained transition model.
         """
         extract_fn = getattr(llm_client, "extract_environment_spec", None)
         if extract_fn is None:
@@ -251,7 +342,7 @@ class EnvironmentBuilder:
         neural: NeuralEngine,
         episodes: list[dict],
         personality_vector: list[float],
-    ) -> EnvironmentSpec:
+    ) -> tuple[EnvironmentSpec, WorldModel]:
         """Build environment from NeuralEngine patterns (no LLM needed).
 
         Derives actions, observations, rewards, and transitions from
@@ -268,8 +359,8 @@ class EnvironmentBuilder:
 
         Returns
         -------
-        EnvironmentSpec
-            The derived environment specification.
+        tuple[EnvironmentSpec, WorldModel]
+            The derived task specification and trained transition model.
         """
         # Ensure engine is trained
         if not neural.is_trained and episodes:
@@ -294,14 +385,27 @@ class EnvironmentBuilder:
         # Horizon based on episode count (more data → longer horizon)
         horizon = min(max(len(episodes), 5), 20)
 
-        return EnvironmentSpec(
+        spec = EnvironmentSpec(
             actions=actions,
             observations=observations,
             reward_signals=reward_signals,
-            transition_weights=transition_weights,
+            world_model_type="co_occurrence",
+            world_model_params={"source": "neural_engine"},
             horizon=horizon,
             gamma=0.95,
         )
+
+        world_model = WorldModel(
+            model_type="co_occurrence",
+            params={"source": "neural_engine"},
+            transition_weights=transition_weights,
+            metrics={
+                "action_count": float(len(actions)),
+                "observation_count": float(len(observations)),
+            },
+        )
+
+        return spec, world_model
 
     # -- internal helpers ---------------------------------------------------
 
@@ -469,10 +573,10 @@ class EnvironmentBuilder:
         return transitions
 
     @staticmethod
-    def _parse_llm_spec(raw: dict) -> EnvironmentSpec:
-        """Parse LLM-returned dict into EnvironmentSpec."""
+    def _parse_llm_spec(raw: dict) -> tuple[EnvironmentSpec, WorldModel]:
+        """Parse LLM-returned dict into EnvironmentSpec + WorldModel."""
         if not isinstance(raw, dict):
-            return EnvironmentSpec()
+            return EnvironmentSpec(), WorldModel()
 
         actions = raw.get("actions", [])
         if not isinstance(actions, list):
@@ -513,11 +617,24 @@ class EnvironmentBuilder:
         horizon = max(1, min(horizon, 50))
         gamma = max(0.0, min(gamma, 1.0))
 
-        return EnvironmentSpec(
+        spec = EnvironmentSpec(
             actions=actions,
             observations=observations,
             reward_signals=reward_signals,
-            transition_weights=transition_weights,
+            world_model_type="llm_derived",
+            world_model_params={"source": "llm"},
             horizon=horizon,
             gamma=gamma,
         )
+
+        world_model = WorldModel(
+            model_type="llm_derived",
+            params={"source": "llm"},
+            transition_weights=transition_weights,
+            metrics={
+                "action_count": float(len(actions)),
+                "observation_count": float(len(observations)),
+            },
+        )
+
+        return spec, world_model

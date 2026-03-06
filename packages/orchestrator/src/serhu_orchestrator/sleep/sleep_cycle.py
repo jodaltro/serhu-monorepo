@@ -3,6 +3,8 @@
 Implements a state-machine-like sleep cycle inspired by AWS Step Functions:
 0. **Environment Build** – LLM extracts AIXI inputs (one-shot) or
                            NeuralEngine derives them from learned patterns.
+                           Produces an ``EnvironmentSpec`` (task description)
+                           and a ``WorldModel`` (trained transition model).
 1. **Training**       – NeuralEngine learns from episodic memories
                         (transformer-inspired self-attention and pattern mining).
 2. **Semantization**  – Extract semantic facts using learned patterns.
@@ -39,7 +41,7 @@ import threading
 from dataclasses import dataclass, field
 
 from serhu_orchestrator.personality.types import PersonalityState
-from serhu_orchestrator.sleep.aixi_environment import EnvironmentSpec
+from serhu_orchestrator.sleep.aixi_environment import EnvironmentSpec, WorldModel
 from serhu_orchestrator.sleep.dream_engine import DreamEngine, Hypothesis
 from serhu_orchestrator.sleep.neural_engine import NeuralEngine, TrainingResult
 
@@ -71,6 +73,9 @@ class SleepResult:
     environment_spec : EnvironmentSpec | None
         The AIXI environment specification built at sleep start
         (from LLM or NeuralEngine).
+    world_model : WorldModel | None
+        The trained transition model used for AIXI rollouts,
+        versioned separately from the environment spec.
     """
 
     facts_extracted: list[str] = field(default_factory=list)
@@ -81,6 +86,7 @@ class SleepResult:
     cycles_completed: int = 0
     training_result: TrainingResult | None = None
     environment_spec: EnvironmentSpec | None = None
+    world_model: WorldModel | None = None
 
 
 class SleepCycle:
@@ -167,6 +173,7 @@ class SleepCycle:
             episodes, personality_vector, personality_summary
         )
         result.environment_spec = env_spec
+        result.world_model = self.dream_engine.world_model
 
         # Phase 1: Train NeuralEngine on episodes (self-learning)
         logger.info(f"  Phase 1: Training NeuralEngine on {len(episodes)} episodes")
@@ -258,6 +265,7 @@ class SleepCycle:
             episodes, personality_vector, personality_summary
         )
         result.environment_spec = env_spec
+        result.world_model = self.dream_engine.world_model
 
         # Phase 1 (once): Train NeuralEngine on episodes
         neural = self.dream_engine.neural_engine

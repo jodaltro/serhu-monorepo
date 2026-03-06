@@ -33,6 +33,7 @@ from serhu_orchestrator.sleep.aixi_environment import (
     AixiEnvironment,
     EnvironmentBuilder,
     EnvironmentSpec,
+    WorldModel,
 )
 from serhu_orchestrator.sleep.neural_engine import NeuralEngine, TrainingResult
 
@@ -100,6 +101,7 @@ class DreamEngine:
         self._llm_client = llm_client
         self._training_result: TrainingResult | None = None
         self._environment_spec: EnvironmentSpec | None = None
+        self._world_model: WorldModel | None = None
 
     @property
     def neural_engine(self) -> NeuralEngine:
@@ -116,6 +118,11 @@ class DreamEngine:
         """The environment spec used for the latest rollouts."""
         return self._environment_spec
 
+    @property
+    def world_model(self) -> WorldModel | None:
+        """The world model used for the latest rollouts."""
+        return self._world_model
+
     # -- Environment building (LLM used only here) --------------------------
 
     def build_environment(
@@ -130,6 +137,9 @@ class DreamEngine:
         ``llm_client`` is available, it extracts a rich environment
         specification from the episodes and personality.  Otherwise,
         the NeuralEngine's learned patterns are used.
+
+        The ``WorldModel`` is built alongside the spec and stored
+        internally for use during rollouts.
 
         Parameters
         ----------
@@ -147,7 +157,7 @@ class DreamEngine:
         """
         if self._llm_client is not None:
             logger.info("  Building AIXI environment from LLM (one-shot)")
-            self._environment_spec = EnvironmentBuilder.from_llm(
+            self._environment_spec, self._world_model = EnvironmentBuilder.from_llm(
                 self._llm_client,
                 episodes,
                 personality_summary,
@@ -155,7 +165,7 @@ class DreamEngine:
             )
         else:
             logger.info("  Building AIXI environment from NeuralEngine")
-            self._environment_spec = EnvironmentBuilder.from_neural_engine(
+            self._environment_spec, self._world_model = EnvironmentBuilder.from_neural_engine(
                 self._neural, episodes, personality_vector
             )
 
@@ -166,6 +176,13 @@ class DreamEngine:
             self._environment_spec.horizon,
             self._environment_spec.gamma,
         )
+        if self._world_model:
+            logger.info(
+                "  WorldModel: type=%s, version=%s, %d transitions",
+                self._world_model.model_type,
+                self._world_model.version,
+                len(self._world_model.transition_weights),
+            )
         return self._environment_spec
 
     # -- REM phase: AIXI rollouts -------------------------------------------
@@ -229,7 +246,10 @@ class DreamEngine:
 
         # Step 3: Run AIXI rollouts against the environment
         hypotheses: list[Hypothesis] = []
-        env = AixiEnvironment(spec, personality_vector, seed=self._seed)
+        env = AixiEnvironment(
+            spec, personality_vector, seed=self._seed,
+            world_model=self._world_model,
+        )
 
         for i in range(num_rollouts):
             obs = env.reset()

@@ -6,6 +6,7 @@ from serhu_orchestrator.sleep.aixi_environment import (
     AixiEnvironment,
     EnvironmentBuilder,
     EnvironmentSpec,
+    WorldModel,
 )
 from serhu_orchestrator.sleep.neural_engine import NeuralEngine
 from serhu_orchestrator.sleep.dream_engine import DreamEngine, Hypothesis
@@ -26,7 +27,8 @@ class TestEnvironmentSpec:
         assert spec.actions == []
         assert spec.observations == []
         assert spec.reward_signals == {}
-        assert spec.transition_weights == {}
+        assert spec.world_model_type == "co_occurrence"
+        assert spec.world_model_params == {}
         assert spec.horizon == 10
         assert spec.gamma == 0.95
 
@@ -35,14 +37,95 @@ class TestEnvironmentSpec:
             actions=["explore", "ask"],
             observations=["happy", "curious"],
             reward_signals={"explore": 0.5},
+            world_model_type="neural",
+            world_model_params={"source": "test"},
             horizon=15,
             gamma=0.9,
         )
         assert len(spec.actions) == 2
         assert len(spec.observations) == 2
         assert spec.reward_signals["explore"] == 0.5
+        assert spec.world_model_type == "neural"
+        assert spec.world_model_params == {"source": "test"}
         assert spec.horizon == 15
         assert spec.gamma == 0.9
+
+    def test_spec_does_not_carry_transition_weights(self):
+        """EnvironmentSpec must not contain transition_weights (moved to WorldModel)."""
+        spec = EnvironmentSpec()
+        assert not hasattr(spec, "transition_weights")
+
+
+# ---------------------------------------------------------------------------
+# WorldModel tests
+# ---------------------------------------------------------------------------
+
+
+class TestWorldModel:
+    """Tests for the WorldModel dataclass."""
+
+    def test_default_model(self):
+        model = WorldModel()
+        assert model.model_type == "co_occurrence"
+        assert model.transition_weights == {}
+        assert model.version == ""
+        assert model.metrics == {}
+
+    def test_custom_model(self):
+        model = WorldModel(
+            model_type="llm_derived",
+            params={"source": "llm"},
+            transition_weights={
+                "explore": [("happy", 0.7), ("sad", 0.3)],
+            },
+            metrics={"coverage": 0.85},
+        )
+        assert model.model_type == "llm_derived"
+        assert len(model.transition_weights) == 1
+        assert model.version != ""  # auto-computed
+        assert model.metrics["coverage"] == 0.85
+
+    def test_version_auto_computed(self):
+        model = WorldModel(
+            transition_weights={
+                "act1": [("obs1", 1.0)],
+            }
+        )
+        assert len(model.version) == 12  # sha256[:12]
+
+    def test_version_deterministic(self):
+        weights = {"act1": [("obs1", 0.5), ("obs2", 0.5)]}
+        m1 = WorldModel(transition_weights=weights)
+        m2 = WorldModel(transition_weights=weights)
+        assert m1.version == m2.version
+
+    def test_transition_uses_weights(self):
+        import random
+
+        model = WorldModel(
+            transition_weights={
+                "explore": [("happy", 1.0)],
+            }
+        )
+        rng = random.Random(42)
+        result = model.transition("explore", ["happy", "sad"], rng)
+        assert result == "happy"
+
+    def test_transition_fallback_random(self):
+        import random
+
+        model = WorldModel()
+        rng = random.Random(42)
+        result = model.transition("unknown", ["obs1", "obs2"], rng)
+        assert result in {"obs1", "obs2"}
+
+    def test_transition_fallback_no_observations(self):
+        import random
+
+        model = WorldModel()
+        rng = random.Random(42)
+        result = model.transition("unknown", [], rng)
+        assert result == "unknown"
 
 
 # ---------------------------------------------------------------------------
@@ -63,6 +146,12 @@ class TestAixiEnvironment:
                 "user_happy": 0.4,
                 "silence": -0.1,
             },
+            horizon=5,
+            gamma=0.95,
+        )
+
+    def _make_world_model(self) -> WorldModel:
+        return WorldModel(
             transition_weights={
                 "explore_topic": [
                     ("user_curious", 0.5),
@@ -75,17 +164,21 @@ class TestAixiEnvironment:
                     ("silence", 0.2),
                 ],
             },
-            horizon=5,
-            gamma=0.95,
         )
 
     def test_reset_returns_observation(self):
-        env = AixiEnvironment(self._make_spec(), [0.5] * 72, seed=42)
+        env = AixiEnvironment(
+            self._make_spec(), [0.5] * 72, seed=42,
+            world_model=self._make_world_model(),
+        )
         obs = env.reset()
         assert obs in {"user_happy", "user_curious", "silence"}
 
     def test_step_returns_tuple(self):
-        env = AixiEnvironment(self._make_spec(), [0.5] * 72, seed=42)
+        env = AixiEnvironment(
+            self._make_spec(), [0.5] * 72, seed=42,
+            world_model=self._make_world_model(),
+        )
         env.reset()
         obs, reward, done, info = env.step("explore_topic")
         assert isinstance(obs, str)
@@ -94,7 +187,10 @@ class TestAixiEnvironment:
         assert isinstance(info, dict)
 
     def test_step_transitions_with_model(self):
-        env = AixiEnvironment(self._make_spec(), [0.5] * 72, seed=42)
+        env = AixiEnvironment(
+            self._make_spec(), [0.5] * 72, seed=42,
+            world_model=self._make_world_model(),
+        )
         env.reset()
         obs, _, _, _ = env.step("explore_topic")
         # Should get one of the transition observations
@@ -103,7 +199,10 @@ class TestAixiEnvironment:
     def test_step_done_at_horizon(self):
         spec = self._make_spec()
         spec.horizon = 3
-        env = AixiEnvironment(spec, [0.5] * 72, seed=42)
+        env = AixiEnvironment(
+            spec, [0.5] * 72, seed=42,
+            world_model=self._make_world_model(),
+        )
         env.reset()
         for i in range(3):
             _, _, done, _ = env.step("explore_topic")
@@ -112,7 +211,10 @@ class TestAixiEnvironment:
     def test_step_not_done_before_horizon(self):
         spec = self._make_spec()
         spec.horizon = 5
-        env = AixiEnvironment(spec, [0.5] * 72, seed=42)
+        env = AixiEnvironment(
+            spec, [0.5] * 72, seed=42,
+            world_model=self._make_world_model(),
+        )
         env.reset()
         _, _, done, _ = env.step("explore_topic")
         assert done is False
@@ -122,12 +224,14 @@ class TestAixiEnvironment:
             actions=["explore_topic"],
             observations=["user_happy"],
             reward_signals={"explore": 0.5, "user_happy": 0.3},
+            horizon=5,
+        )
+        wm = WorldModel(
             transition_weights={
                 "explore_topic": [("user_happy", 1.0)],
             },
-            horizon=5,
         )
-        env = AixiEnvironment(spec, [0.5] * 72, seed=42)
+        env = AixiEnvironment(spec, [0.5] * 72, seed=42, world_model=wm)
         env.reset()
         _, reward, _, _ = env.step("explore_topic")
         # Should include rewards from both "explore" (in action) and "user_happy" (in obs)
@@ -138,10 +242,12 @@ class TestAixiEnvironment:
             actions=["explore_novel"],
             observations=["user_curious"],
             reward_signals={},
+            horizon=5,
+        )
+        wm = WorldModel(
             transition_weights={
                 "explore_novel": [("user_curious", 1.0)],
             },
-            horizon=5,
         )
         # High openness + curiosity
         high_vec = [0.5] * 72
@@ -152,18 +258,21 @@ class TestAixiEnvironment:
         low_vec[20] = 0.0
         low_vec[24] = 0.0
 
-        env_high = AixiEnvironment(spec, high_vec, seed=42)
+        env_high = AixiEnvironment(spec, high_vec, seed=42, world_model=wm)
         env_high.reset()
         _, r_high, _, _ = env_high.step("explore_novel")
 
-        env_low = AixiEnvironment(spec, low_vec, seed=42)
+        env_low = AixiEnvironment(spec, low_vec, seed=42, world_model=wm)
         env_low.reset()
         _, r_low, _, _ = env_low.step("explore_novel")
 
         assert r_high > r_low
 
     def test_reset_resets_step_count(self):
-        env = AixiEnvironment(self._make_spec(), [0.5] * 72, seed=42)
+        env = AixiEnvironment(
+            self._make_spec(), [0.5] * 72, seed=42,
+            world_model=self._make_world_model(),
+        )
         env.reset()
         env.step("explore_topic")
         env.step("ask_question")
@@ -174,8 +283,9 @@ class TestAixiEnvironment:
 
     def test_deterministic_with_seed(self):
         spec = self._make_spec()
-        env1 = AixiEnvironment(spec, [0.5] * 72, seed=42)
-        env2 = AixiEnvironment(spec, [0.5] * 72, seed=42)
+        wm = self._make_world_model()
+        env1 = AixiEnvironment(spec, [0.5] * 72, seed=42, world_model=wm)
+        env2 = AixiEnvironment(spec, [0.5] * 72, seed=42, world_model=wm)
 
         obs1 = env1.reset()
         obs2 = env2.reset()
@@ -187,7 +297,10 @@ class TestAixiEnvironment:
         assert result1[1] == result2[1]  # reward
 
     def test_fallback_for_unknown_action(self):
-        env = AixiEnvironment(self._make_spec(), [0.5] * 72, seed=42)
+        env = AixiEnvironment(
+            self._make_spec(), [0.5] * 72, seed=42,
+            world_model=self._make_world_model(),
+        )
         env.reset()
         obs, reward, done, info = env.step("reflect_on_self")
         # reflect_on_self has no transition_weights, fallback to random obs
@@ -200,6 +313,17 @@ class TestAixiEnvironment:
         assert obs == "initial_state"
         obs, reward, done, info = env.step("noop")
         assert obs == "obs_1"
+
+    def test_no_world_model_uses_random_fallback(self):
+        spec = EnvironmentSpec(
+            actions=["act1"],
+            observations=["obs1", "obs2"],
+            horizon=5,
+        )
+        env = AixiEnvironment(spec, [0.5] * 72, seed=42)
+        env.reset()
+        obs, _, _, _ = env.step("act1")
+        assert obs in {"obs1", "obs2"}
 
 
 # ---------------------------------------------------------------------------
@@ -219,21 +343,23 @@ class TestEnvironmentBuilderFromNeuralEngine:
         neural = NeuralEngine(seed=42)
         personality = [0.5] * 72
 
-        spec = EnvironmentBuilder.from_neural_engine(neural, episodes, personality)
+        spec, wm = EnvironmentBuilder.from_neural_engine(neural, episodes, personality)
 
         assert isinstance(spec, EnvironmentSpec)
+        assert isinstance(wm, WorldModel)
         assert len(spec.actions) > 0
         assert len(spec.observations) > 0
         assert len(spec.reward_signals) > 0
         assert spec.horizon >= 3
         assert 0.0 < spec.gamma <= 1.0
+        assert spec.world_model_type == "co_occurrence"
 
     def test_includes_base_actions(self):
         episodes = [{"content": "Hello world"}]
         neural = NeuralEngine(seed=42)
         personality = [0.5] * 72
 
-        spec = EnvironmentBuilder.from_neural_engine(neural, episodes, personality)
+        spec, _ = EnvironmentBuilder.from_neural_engine(neural, episodes, personality)
 
         assert "respond_empathically" in spec.actions
         assert "ask_question" in spec.actions
@@ -247,7 +373,7 @@ class TestEnvironmentBuilderFromNeuralEngine:
         neural = NeuralEngine(seed=42)
         personality = [0.5] * 72
 
-        spec = EnvironmentBuilder.from_neural_engine(neural, episodes, personality)
+        spec, _ = EnvironmentBuilder.from_neural_engine(neural, episodes, personality)
 
         # Should derive topic-specific actions from vocabulary
         action_text = " ".join(spec.actions)
@@ -258,7 +384,7 @@ class TestEnvironmentBuilderFromNeuralEngine:
         neural = NeuralEngine(seed=42)
         personality = [0.5] * 72
 
-        spec = EnvironmentBuilder.from_neural_engine(neural, episodes, personality)
+        spec, _ = EnvironmentBuilder.from_neural_engine(neural, episodes, personality)
 
         assert "user_engaged" in spec.observations
         assert "user_curious" in spec.observations
@@ -275,8 +401,8 @@ class TestEnvironmentBuilderFromNeuralEngine:
         low_open = [0.5] * 72
         low_open[20] = 0.0
 
-        spec_high = EnvironmentBuilder.from_neural_engine(neural, episodes, high_open)
-        spec_low = EnvironmentBuilder.from_neural_engine(neural, episodes, low_open)
+        spec_high, _ = EnvironmentBuilder.from_neural_engine(neural, episodes, high_open)
+        spec_low, _ = EnvironmentBuilder.from_neural_engine(neural, episodes, low_open)
 
         # "explore" reward should be higher for open personality
         assert spec_high.reward_signals.get("explore", 0) > spec_low.reward_signals.get("explore", 0)
@@ -287,30 +413,40 @@ class TestEnvironmentBuilderFromNeuralEngine:
         neural = NeuralEngine(seed=42)
         personality = [0.5] * 72
 
-        spec_few = EnvironmentBuilder.from_neural_engine(neural, few_eps, personality)
-        spec_many = EnvironmentBuilder.from_neural_engine(neural, many_eps, personality)
+        spec_few, _ = EnvironmentBuilder.from_neural_engine(neural, few_eps, personality)
+        spec_many, _ = EnvironmentBuilder.from_neural_engine(neural, many_eps, personality)
 
         assert spec_many.horizon >= spec_few.horizon
 
-    def test_transition_weights_populated(self):
+    def test_world_model_transition_weights_populated(self):
         episodes = [{"content": "Test interaction"}]
         neural = NeuralEngine(seed=42)
         personality = [0.5] * 72
 
-        spec = EnvironmentBuilder.from_neural_engine(neural, episodes, personality)
+        spec, wm = EnvironmentBuilder.from_neural_engine(neural, episodes, personality)
 
-        # Each action should have transitions
+        # Each action should have transitions in the WorldModel
         for action in spec.actions:
-            assert action in spec.transition_weights
-            assert len(spec.transition_weights[action]) > 0
+            assert action in wm.transition_weights
+            assert len(wm.transition_weights[action]) > 0
+
+    def test_world_model_has_version(self):
+        episodes = [{"content": "Test interaction"}]
+        neural = NeuralEngine(seed=42)
+        personality = [0.5] * 72
+
+        _, wm = EnvironmentBuilder.from_neural_engine(neural, episodes, personality)
+        assert wm.version != ""
+        assert wm.model_type == "co_occurrence"
 
     def test_empty_episodes(self):
         neural = NeuralEngine(seed=42)
         personality = [0.5] * 72
 
-        spec = EnvironmentBuilder.from_neural_engine(neural, [], personality)
+        spec, wm = EnvironmentBuilder.from_neural_engine(neural, [], personality)
 
         assert isinstance(spec, EnvironmentSpec)
+        assert isinstance(wm, WorldModel)
         assert len(spec.actions) >= 5  # base actions
 
 
@@ -328,7 +464,7 @@ class TestEnvironmentBuilderFromLLM:
             }
         })()
 
-        spec = EnvironmentBuilder.from_llm(
+        spec, wm = EnvironmentBuilder.from_llm(
             mock_llm,
             [{"content": "test"}],
             "personality summary",
@@ -340,11 +476,13 @@ class TestEnvironmentBuilderFromLLM:
         assert "obs_1" in spec.observations
         assert spec.horizon == 12
         assert spec.gamma == 0.9
+        assert spec.world_model_type == "llm_derived"
+        assert isinstance(wm, WorldModel)
 
     def test_falls_back_when_no_extract_method(self):
         mock_llm = type("MockLLM", (), {})()
 
-        spec = EnvironmentBuilder.from_llm(
+        spec, wm = EnvironmentBuilder.from_llm(
             mock_llm,
             [{"content": "test"}],
             "personality summary",
@@ -353,6 +491,7 @@ class TestEnvironmentBuilderFromLLM:
 
         # Should fall back to NeuralEngine-based spec
         assert isinstance(spec, EnvironmentSpec)
+        assert isinstance(wm, WorldModel)
         assert len(spec.actions) >= 5
 
     def test_falls_back_on_llm_error(self):
@@ -360,7 +499,7 @@ class TestEnvironmentBuilderFromLLM:
             "extract_environment_spec": lambda self, eps, summary: (_ for _ in ()).throw(RuntimeError("API error"))
         })()
 
-        spec = EnvironmentBuilder.from_llm(
+        spec, wm = EnvironmentBuilder.from_llm(
             mock_llm,
             [{"content": "test"}],
             "personality summary",
@@ -368,6 +507,7 @@ class TestEnvironmentBuilderFromLLM:
         )
 
         assert isinstance(spec, EnvironmentSpec)
+        assert isinstance(wm, WorldModel)
         assert len(spec.actions) >= 5
 
 
@@ -385,29 +525,35 @@ class TestEnvironmentBuilderParseLLMSpec:
             "horizon": 8,
             "gamma": 0.9,
         }
-        spec = EnvironmentBuilder._parse_llm_spec(raw)
+        spec, wm = EnvironmentBuilder._parse_llm_spec(raw)
         assert spec.actions == ["act1", "act2"]
         assert spec.observations == ["obs1"]
         assert spec.reward_signals == {"act1": 0.5}
+        assert spec.world_model_type == "llm_derived"
         assert spec.horizon == 8
         assert spec.gamma == 0.9
+        # Transition weights live in WorldModel, not spec
+        assert wm.transition_weights == {"act1": [("obs1", 1.0)]}
+        assert wm.model_type == "llm_derived"
 
     def test_handles_empty_dict(self):
-        spec = EnvironmentBuilder._parse_llm_spec({})
+        spec, wm = EnvironmentBuilder._parse_llm_spec({})
         assert spec.actions == []
         assert spec.observations == []
         assert spec.horizon == 10
+        assert wm.transition_weights == {}
 
     def test_handles_non_dict(self):
-        spec = EnvironmentBuilder._parse_llm_spec("not a dict")
+        spec, wm = EnvironmentBuilder._parse_llm_spec("not a dict")
         assert spec.actions == []
+        assert wm.transition_weights == {}
 
     def test_clamps_horizon(self):
-        spec = EnvironmentBuilder._parse_llm_spec({"horizon": 100})
+        spec, _ = EnvironmentBuilder._parse_llm_spec({"horizon": 100})
         assert spec.horizon <= 50
 
     def test_clamps_gamma(self):
-        spec = EnvironmentBuilder._parse_llm_spec({"gamma": 2.0})
+        spec, _ = EnvironmentBuilder._parse_llm_spec({"gamma": 2.0})
         assert spec.gamma <= 1.0
 
 
@@ -430,6 +576,7 @@ class TestDreamEngineWithEnvironment:
 
         assert engine.environment_spec is not None
         assert len(engine.environment_spec.actions) > 0
+        assert engine.world_model is not None
 
     def test_hypotheses_contain_action_traces(self):
         engine = DreamEngine(seed=42)
@@ -486,6 +633,10 @@ class TestDreamEngineWithEnvironment:
         assert "llm_explore" in spec.actions
         assert spec.horizon == 8
 
+        wm = engine.world_model
+        assert wm is not None
+        assert wm.model_type == "llm_derived"
+
     def test_explicit_build_then_rollouts(self):
         engine = DreamEngine(seed=42)
         history = [{"content": "test episode"}]
@@ -501,6 +652,23 @@ class TestDreamEngineWithEnvironment:
         )
         assert len(results) == 5
         assert engine.environment_spec is spec
+
+    def test_world_model_separate_from_spec(self):
+        engine = DreamEngine(seed=42)
+        history = [{"content": "test episode"}]
+        personality = [0.5] * 72
+
+        engine.build_environment(history, personality)
+
+        spec = engine.environment_spec
+        wm = engine.world_model
+        assert spec is not None
+        assert wm is not None
+        # Spec has no transition_weights attribute
+        assert not hasattr(spec, "transition_weights")
+        # WorldModel has the transitions
+        assert len(wm.transition_weights) > 0
+        assert wm.version != ""
 
 
 # ---------------------------------------------------------------------------
@@ -526,6 +694,8 @@ class TestSleepCycleEnvironment:
         assert result.environment_spec is not None
         assert len(result.environment_spec.actions) > 0
         assert len(result.environment_spec.observations) > 0
+        assert result.world_model is not None
+        assert result.world_model.version != ""
 
     def test_continuous_includes_environment_spec(self):
         state = self._make_state()
@@ -541,6 +711,7 @@ class TestSleepCycleEnvironment:
         )
 
         assert result.environment_spec is not None
+        assert result.world_model is not None
 
     def test_run_with_llm_builds_environment_from_llm(self):
         mock_llm = type("MockLLM", (), {
@@ -565,3 +736,8 @@ class TestSleepCycleEnvironment:
         assert "llm_act_1" in spec.actions
         assert spec.horizon == 7
         assert spec.gamma == 0.88
+        assert spec.world_model_type == "llm_derived"
+
+        wm = result.world_model
+        assert wm is not None
+        assert wm.model_type == "llm_derived"
