@@ -3,6 +3,9 @@
 Implements the two core sleep phases:
 1. **REM (Dreaming)**: Monte-Carlo AIXI-CTW rollouts that generate
    hypothetical future interactions, scored by coherence.
+   When an ``LLMClient`` is provided, hypothesis generation is enhanced
+   via Solomonoff Induction (LLM discovers algorithmic patterns) and
+   rollouts are simulated as projected future conversations.
 2. **NREM (Consolidation)**: SVD rank-reduction applied to personality
    trait vectors, eliminating noise and crystallising intuition.
 
@@ -12,13 +15,18 @@ References:
     - Solomonoff induction: https://www.amazon.science/blog/solomonic-learning-large-language-models-and-the-art-of-induction
     - Dream Pruning / SVD: https://pub.towardsai.net/dream-pruning-what-happens-when-ai-models-sleep-3db3c404e24a
     - Dream2Learn: https://arxiv.org/html/2603.01935v1
+    - LLM as universal solver: https://arxiv.org/html/2507.21065v1
 """
 
 from __future__ import annotations
 
+import logging
 import math
 import random
 from dataclasses import dataclass, field
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -43,14 +51,27 @@ class Hypothesis:
 class DreamEngine:
     """Generates dream hypotheses and consolidates personality via SVD.
 
+    When an ``LLMClient`` is provided, hypothesis generation uses
+    Solomonoff Induction (LLM-powered pattern discovery) and rollouts
+    simulate projected future conversations.  Without an LLM client,
+    the engine falls back to random Monte-Carlo rollouts.
+
     Parameters
     ----------
     seed : int | None
         Random seed for reproducible dream rollouts.
+    llm_client : object | None
+        An object satisfying the ``LLMClient`` protocol (e.g. ``OpenAIClient``).
+        Enables LLM-powered hypothesis generation and dream simulation.
     """
 
-    def __init__(self, seed: int | None = None) -> None:
+    def __init__(
+        self,
+        seed: int | None = None,
+        llm_client: object | None = None,
+    ) -> None:
         self._rng = random.Random(seed)
+        self._llm = llm_client
 
     # -- REM phase: AIXI rollouts -------------------------------------------
 
@@ -61,13 +82,19 @@ class DreamEngine:
         *,
         num_rollouts: int = 1000,
         top_k: int = 10,
+        personality_summary: str = "",
     ) -> list[Hypothesis]:
         """Simulate future interactions using MC-AIXI-CTW-inspired rollouts.
 
-        Each rollout generates a hypothetical response weighted by
-        personality traits, then scores it for coherence.  The top-k
-        simplest and most rewarding hypotheses are returned for
-        integration into the Being's belief stack.
+        When an LLM client is available, hypothesis generation is enhanced:
+        1. **Solomonoff Induction**: The LLM discovers algorithmic patterns
+           in the episodic data, producing meaningful hypotheses.
+        2. **Dream Simulation**: The LLM projects future conversations to
+           test how the consolidated personality would react.
+        3. **Random Diversity**: Remaining rollout slots are filled with
+           random Monte-Carlo hypotheses for exploration breadth.
+
+        Without an LLM, all rollouts use the original random approach.
 
         Parameters
         ----------
@@ -79,34 +106,115 @@ class DreamEngine:
             Number of Monte-Carlo rollouts.
         top_k : int
             Number of best hypotheses to retain.
+        personality_summary : str
+            Compact personality summary for LLM context (only used when
+            an LLM client is available).
 
         Returns
         -------
         list[Hypothesis]
             Top-k hypotheses sorted by reward (descending).
-
-        References
-        ----------
-        MC-AIXI-CTW: https://users.cecs.anu.edu.au/~kee/jair-aixi-ctw.pdf
         """
         hypotheses: list[Hypothesis] = []
 
-        # Context Tree Weighting: build a simple context from recent history
+        # Phase 1: LLM-enhanced hypotheses (Solomonoff Induction + simulation)
+        if self._llm is not None:
+            try:
+                llm_hypotheses = self._llm_enhanced_rollouts(
+                    history, personality_vector, personality_summary, top_k
+                )
+                hypotheses.extend(llm_hypotheses)
+            except Exception:
+                logger.warning(
+                    "LLM dream rollouts failed, falling back to random",
+                    exc_info=True,
+                )
+
+        # Phase 2: Fill remaining slots with random Monte-Carlo rollouts
+        remaining = max(num_rollouts - len(hypotheses), 0)
+        if remaining > 0:
+            random_hypotheses = self._random_rollouts(
+                history, personality_vector, remaining, top_k
+            )
+            hypotheses.extend(random_hypotheses)
+
+        # Return the top-k hypotheses (Ockham: prefer simple + high-reward)
+        hypotheses.sort(key=lambda h: h.reward, reverse=True)
+        return hypotheses[:top_k]
+
+    def _llm_enhanced_rollouts(
+        self,
+        history: list[dict],
+        personality_vector: list[float],
+        personality_summary: str,
+        top_k: int,
+    ) -> list[Hypothesis]:
+        """Generate and evaluate hypotheses using the LLM.
+
+        1. Solomonoff Induction: LLM generates pattern-based hypotheses.
+        2. Dream Simulation: LLM evaluates coherence of each hypothesis.
+        """
+        context_signal = self._extract_context_signal(history)
+
+        # Step 1: Generate hypotheses via Solomonoff Induction
+        raw_hypotheses = self._llm.generate_dream_hypotheses(
+            episodes=history,
+            personality_summary=personality_summary,
+            num_hypotheses=top_k,
+        )
+
+        if not raw_hypotheses:
+            return []
+
+        # Step 2: Simulate and score via dream rollouts
+        scored = self._llm.simulate_dream_rollouts(
+            hypotheses=raw_hypotheses,
+            personality_summary=personality_summary,
+            recent_context=context_signal,
+        )
+
+        # Convert to Hypothesis objects
+        results: list[Hypothesis] = []
+        for item in scored:
+            action = item.get("action", "")
+            reward = float(item.get("reward", 0.0))
+            complexity = float(item.get("complexity", 0.0))
+            # Solomonoff-inspired: reward = coherence - log(complexity + 1)
+            adjusted_reward = reward - math.log(complexity + 1.0)
+            results.append(
+                Hypothesis(action=action, reward=adjusted_reward, complexity=complexity)
+            )
+
+        # Also create Hypothesis objects from raw hypotheses not in scored
+        scored_actions = {item.get("action", "") for item in scored}
+        for h_text in raw_hypotheses:
+            if h_text not in scored_actions:
+                results.append(
+                    Hypothesis(action=h_text, reward=0.1, complexity=0.5)
+                )
+
+        return results
+
+    def _random_rollouts(
+        self,
+        history: list[dict],
+        personality_vector: list[float],
+        num_rollouts: int,
+        top_k: int,
+    ) -> list[Hypothesis]:
+        """Original random Monte-Carlo rollouts."""
+        hypotheses: list[Hypothesis] = []
         context_signal = self._extract_context_signal(history)
 
         for _ in range(num_rollouts):
-            # Generate a simulated action influenced by personality + context
             action, complexity = self._simulate_action(
                 context_signal, personality_vector
             )
-            # Evaluate coherence reward using Solomonoff-inspired scoring:
-            # reward = coherence_with_history - complexity_penalty
             reward = self._evaluate_coherence(action, context_signal, complexity)
             hypotheses.append(
                 Hypothesis(action=action, reward=reward, complexity=complexity)
             )
 
-        # Return the top-k hypotheses (Ockham: prefer simple + high-reward)
         hypotheses.sort(key=lambda h: h.reward, reverse=True)
         return hypotheses[:top_k]
 

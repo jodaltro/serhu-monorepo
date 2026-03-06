@@ -139,3 +139,58 @@ class LLMClient(Protocol):
             New core beliefs to add to the Being's belief stack.
         """
         ...
+
+    def generate_dream_hypotheses(
+        self,
+        episodes: list[dict],
+        personality_summary: str,
+        num_hypotheses: int = 10,
+    ) -> list[str]:
+        """Generate dream hypotheses via Solomonoff Induction.
+
+        The LLM acts as a universal solver, identifying algorithmic
+        patterns in the observed episodic data and generating concise
+        explanations/predictions about the user and the world.
+
+        Parameters
+        ----------
+        episodes : list[dict]
+            Recent episodic memory entries.
+        personality_summary : str
+            Summary of the Being's current personality state.
+        num_hypotheses : int
+            Number of hypotheses to generate.
+
+        Returns
+        -------
+        list[str]
+            Generated hypothesis strings.
+        """
+        ...
+
+    def simulate_dream_rollouts(
+        self,
+        hypotheses: list[str],
+        personality_summary: str,
+        recent_context: list[str],
+    ) -> list[dict]:
+        """Simulate future conversations to test personality coherence.
+
+        The LLM projects how the Being would react to each hypothesis,
+        scoring each for coherence with the consolidated personality.
+
+        Parameters
+        ----------
+        hypotheses : list[str]
+            Hypotheses to simulate.
+        personality_summary : str
+            Summary of the Being's current personality state.
+        recent_context : list[str]
+            Recent conversation content for context grounding.
+
+        Returns
+        -------
+        list[dict]
+            List of ``{"action": str, "reward": float, "complexity": float}``.
+        """
+        ...
