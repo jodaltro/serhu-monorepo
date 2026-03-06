@@ -167,11 +167,10 @@ def sleep(being_id: str, body: SleepRequest):
 
 
 @router.post("/{being_id}/wake", response_model=WakeResponse)
-def wake(being_id: str, body: WakeRequest | None = None):
+def wake(being_id: str, body: WakeRequest = WakeRequest()):
     """Wake the Being from continuous sleep and retrieve results."""
     orch = _get_orch(being_id)
-    timeout = body.timeout if body else 30.0
-    result = orch.wake(timeout=timeout)
+    result = orch.wake(timeout=body.timeout)
     if result is None:
         return WakeResponse(
             facts_extracted=0,

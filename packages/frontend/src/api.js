@@ -16,6 +16,7 @@ const BASE = import.meta.env.VITE_API_BASE ?? "";
  * @property {number} cognitive_age
  * @property {string} erikson_conflict
  * @property {number} interaction_count
+ * @property {boolean} is_sleeping
  */
 
 /**
@@ -128,17 +129,30 @@ export function consolidate(beingId) {
 }
 
 /**
- * Trigger a full sleep cycle (NREM + REM).
+ * Start continuous AIXI dreaming (runs until wake is called).
  * @param {string} beingId
  * @param {object} [opts]
  * @param {number} [opts.num_rollouts=1000]
  * @param {number} [opts.svd_rank=8]
  * @param {number|null} [opts.seed=null]
- * @returns {Promise<{ facts_extracted: number, beliefs_added: number, hypotheses_generated: number }>}
+ * @returns {Promise<{ is_sleeping: boolean }>}
  */
 export function sleep(beingId, { num_rollouts = 1000, svd_rank = 8, seed = null } = {}) {
   return request(`/beings/${beingId}/sleep`, {
     method: "POST",
     body: JSON.stringify({ num_rollouts, svd_rank, seed }),
+  });
+}
+
+/**
+ * Wake the Being from continuous sleep and retrieve accumulated results.
+ * @param {string} beingId
+ * @param {number} [timeout=30]
+ * @returns {Promise<{ facts_extracted: number, beliefs_added: number, hypotheses_generated: number, cycles_completed: number }>}
+ */
+export function wake(beingId, timeout = 30) {
+  return request(`/beings/${beingId}/wake`, {
+    method: "POST",
+    body: JSON.stringify({ timeout }),
   });
 }

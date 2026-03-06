@@ -403,12 +403,10 @@ class Orchestrator:
                     self._personality = new_state
                     self._sleep_result = result
 
-                # Store extracted facts
-                for fact in result.facts_extracted:
-                    self._memory_manager.store_semantic_fact(fact)
-
-                # Persist the updated personality
-                self._personality_engine._persist(self._personality)
+                    # Store extracted facts and persist inside the lock
+                    for fact in result.facts_extracted:
+                        self._memory_manager.store_semantic_fact(fact)
+                    self._personality_engine._persist(self._personality)
             except Exception:
                 logger.exception("Sleep cycle worker failed")
 
@@ -442,6 +440,13 @@ class Orchestrator:
 
         self._sleep_cycle.request_stop()
         self._sleep_thread.join(timeout=timeout)
+
+        if self._sleep_thread.is_alive():
+            logger.warning(
+                "Sleep thread for Being %s did not finish within %.1fs",
+                self.being_id,
+                timeout,
+            )
 
         with self._sleep_lock:
             result = self._sleep_result

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { createBeing, getBeing, chat, processMessage, getVisualState } from "../../src/api.js";
+import { createBeing, getBeing, chat, processMessage, getVisualState, sleep, wake } from "../../src/api.js";
 
 // Shared mock setup
 let lastFetchUrl;
@@ -117,5 +117,42 @@ describe("error handling", () => {
     };
 
     await expect(getBeing("missing")).rejects.toThrow("API 404: Not found");
+  });
+});
+
+describe("sleep", () => {
+  it("sends POST /beings/{id}/sleep with params", async () => {
+    mockResponse = { ok: true, json: async () => ({ is_sleeping: true }) };
+
+    const result = await sleep("b1", { num_rollouts: 500, svd_rank: 8 });
+
+    expect(lastFetchUrl).toBe("/beings/b1/sleep");
+    expect(lastFetchOpts.method).toBe("POST");
+    const body = JSON.parse(lastFetchOpts.body);
+    expect(body.num_rollouts).toBe(500);
+    expect(body.svd_rank).toBe(8);
+    expect(result.is_sleeping).toBe(true);
+  });
+});
+
+describe("wake", () => {
+  it("sends POST /beings/{id}/wake with timeout", async () => {
+    mockResponse = {
+      ok: true,
+      json: async () => ({
+        facts_extracted: 2,
+        beliefs_added: 1,
+        hypotheses_generated: 5,
+        cycles_completed: 3,
+      }),
+    };
+
+    const result = await wake("b1", 15);
+
+    expect(lastFetchUrl).toBe("/beings/b1/wake");
+    expect(lastFetchOpts.method).toBe("POST");
+    const body = JSON.parse(lastFetchOpts.body);
+    expect(body.timeout).toBe(15);
+    expect(result.cycles_completed).toBe(3);
   });
 });
