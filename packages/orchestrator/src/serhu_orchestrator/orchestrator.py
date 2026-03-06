@@ -9,25 +9,24 @@ Lifecycle phases:
     3. **Sleep**       – Continuous AIXI dreaming via ``sleep()``.
        The sleep runs indefinitely (as AIXI should be) until
        ``wake()`` is called or the user interacts again.
+       During sleep, the NeuralEngine builds the Being's internal
+       language model using transformer-inspired self-attention
+       and pattern mining over episodic memories.
     4. **Wake**        – ``wake()`` stops the sleep loop and returns
        accumulated dream results.
 
-When an ``LLMClient`` is provided (e.g. ``OpenAIClient`` for GPT-5.4),
-the Orchestrator can:
-- Generate Being responses via ``chat()`` with personality-aware prompts.
-- Automatically extract trait deltas from conversations.
-- Enhance sleep-cycle semantization and belief derivation.
-
-Without an LLM client, only ``process_message()`` is available for
-wakefulness interactions, and the sleep cycle falls back to rule-based
-semantization and belief extraction.
+The Being learns from its own experiences—no external LLM dependency.
+The ``chat()`` method generates responses using the Being's learned
+patterns, vocabulary, and personality.  The quality of responses improves
+as the Being accumulates more experience and sleep cycles.
 
 References:
     - MemGPT: https://informationmatters.org/2025/10/memgpt-engineering-semantic-memory/
     - Piaget in AI: https://gregrobison.medium.com/active-learning-machines-...
     - AIXI: https://www.alignmentforum.org/w/aixi
     - Dream Pruning: https://pub.towardsai.net/dream-pruning-what-happens-when-ai-models-sleep-3db3c404e24a
-    - GPT-5.4: https://openai.com/index/introducing-gpt-5/
+    - Attention Is All You Need: https://arxiv.org/abs/1706.03762
+    - Self-supervised learning: https://arxiv.org/abs/2006.08218
 """
 
 from __future__ import annotations
@@ -44,6 +43,7 @@ from serhu_orchestrator.personality.prompt_builder import build_system_prompt
 from serhu_orchestrator.personality.types import PersonalityState
 from serhu_orchestrator.sleep.dream_engine import DreamEngine
 from serhu_orchestrator.sleep.sleep_cycle import SleepCycle, SleepResult
+from serhu_orchestrator.sleep.neural_engine import NeuralEngine
 
 logger = logging.getLogger(__name__)
 
@@ -75,8 +75,8 @@ class Orchestrator:
     embed_fn : callable | None
         Embedding function ``(text) -> list[float]``.
     llm_client : object | None
-        An object satisfying the ``LLMClient`` protocol (e.g. ``OpenAIClient``).
-        Enables GPT-5.4-powered chat, trait extraction, and enhanced sleep.
+        **Deprecated.** Ignored for backward compatibility.
+        The Being now learns from its own experiences via the NeuralEngine.
     """
 
     def __init__(
@@ -94,8 +94,8 @@ class Orchestrator:
         embed_fn: callable | None = None,
         llm_client: object | None = None,
     ) -> None:
-        # -- LLM client (optional) -------------------------------------------
-        self._llm = llm_client
+        # -- NeuralEngine (self-learning) ------------------------------------
+        self._neural = NeuralEngine()
 
         # -- memory tiers ----------------------------------------------------
         self._working = WorkingMemory(max_entries=working_memory_size)
@@ -206,26 +206,23 @@ class Orchestrator:
         auto_traits: bool = True,
         metadata: dict | None = None,
     ) -> tuple[str, ContextWindow]:
-        """Full chat turn: process user message → LLM response → trait analysis.
+        """Full chat turn: process user message → self-generated response.
 
         If the Being is currently sleeping, it will be automatically
         woken up before processing the chat message.
 
-        This is the high-level wakefulness API that uses the LLM to:
-        1. Build a persona-aware system prompt.
-        2. Assemble the conversation context.
-        3. Generate the Being's response via GPT-5.4.
-        4. (Optionally) extract personality trait deltas from the exchange.
-
-        Requires an ``llm_client`` to be configured on the Orchestrator.
+        The Being generates its response using patterns learned during
+        sleep cycles (NeuralEngine) combined with its personality state.
+        Early-stage Beings produce minimal, fragmented responses; as the
+        Being matures through sleep cycles, responses become richer.
 
         Parameters
         ----------
         user_message : str
             The user's input message.
         auto_traits : bool
-            If ``True``, uses the LLM to automatically extract trait deltas
-            from the conversation turn.
+            If ``True``, automatically updates traits based on the
+            interaction content.
         metadata : dict | None
             Optional metadata for the interaction.
 
@@ -233,66 +230,89 @@ class Orchestrator:
         -------
         tuple[str, ContextWindow]
             The Being's response text and the assembled context window.
-
-        Raises
-        ------
-        RuntimeError
-            If no LLM client is configured.
         """
         if self.is_sleeping:
             self.wake()
 
-        if self._llm is None:
-            raise RuntimeError(
-                "chat() requires an LLM client. "
-                "Pass llm_client=OpenAIClient(...) to the Orchestrator."
-            )
-
         # 1. Process user message into memory
         context = self._memory_manager.add_interaction("user", user_message, metadata)
 
-        # 2. Build persona-aware system prompt
-        system_prompt = build_system_prompt(self._personality)
-
-        # 3. Assemble conversation history from working memory
-        messages = [
-            {"role": entry.role, "content": entry.content}
-            for entry in context.working
-        ]
-
-        # 4. Stage-aware LLM parameters – prevent verbose output in early stages
+        # 2. Stage-aware response parameters
         stage = self._personality.development.stage
         age = self._personality.development.cognitive_age
         max_tokens, temperature = stage_llm_params(stage, age)
 
-        # 5. Generate Being's response via LLM
-        llm_response = self._llm.chat(
-            system_prompt,
-            messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-        )
-        being_response = llm_response.content
+        # 3. Generate Being's response from learned patterns + personality
+        recent_context = [entry.content for entry in context.working]
+        personality_vector = SleepCycle._flatten_traits(self._personality)
 
-        # 6. Store Being's response in memory
+        being_response = self._neural.generate_response(
+            recent_context, personality_vector, max_tokens=max_tokens
+        )
+
+        # 4. Store Being's response in memory
         context = self._memory_manager.add_interaction("being", being_response)
 
-        # 7. Optionally extract trait deltas
-        trait_deltas = None
+        # 5. Optionally extract trait deltas from the interaction
         if auto_traits:
-            try:
-                trait_deltas = self._llm.analyze_traits(
-                    system_prompt, user_message, being_response
-                )
-            except Exception:
-                pass
-
-        if trait_deltas:
-            self._personality = self._personality_engine.update_traits(
-                self._personality, trait_deltas
+            trait_deltas = self._extract_trait_deltas_from_interaction(
+                user_message, being_response
             )
+            if trait_deltas:
+                self._personality = self._personality_engine.update_traits(
+                    self._personality, trait_deltas
+                )
 
         return being_response, context
+
+    def _extract_trait_deltas_from_interaction(
+        self,
+        user_message: str,
+        being_response: str,
+    ) -> dict[str, dict[str, float]] | None:
+        """Extract trait deltas from an interaction using pattern analysis.
+
+        Uses the NeuralEngine's vocabulary to identify emotionally and
+        thematically significant content, then maps it to personality
+        trait dimensions.
+
+        Returns
+        -------
+        dict | None
+            Nested trait deltas or None if no significant changes detected.
+        """
+        if not self._neural.is_trained:
+            return None
+
+        # Simple heuristic: words with high TF-IDF in the conversation
+        # suggest topics the user cares about, which shapes the Being
+        tokens = NeuralEngine._tokenize_text(user_message)
+        if not tokens:
+            return None
+
+        # Check vocabulary support for each token
+        significant_tokens = [
+            (t, self._neural._vocabulary.get(t, 0.0))
+            for t in tokens
+            if self._neural._vocabulary.get(t, 0.0) > 0.05
+        ]
+
+        if not significant_tokens:
+            return None
+
+        # Map high-weight tokens to small trait nudges
+        delta = 0.01 * len(significant_tokens) / max(len(tokens), 1)
+        delta = min(delta, 0.05)
+
+        return {
+            "tci_character": {
+                "empathy": delta,
+                "social_acceptance": delta * 0.5,
+            },
+            "hexaco": {
+                "inquisitiveness": delta,
+            },
+        }
 
     # -- twilight phase ------------------------------------------------------
 
@@ -385,9 +405,9 @@ class Orchestrator:
         # Retrieve recent episodes
         episodes = self._relational.get_episodes(self._personality.being_id, limit=100)
 
-        # Create the sleep cycle
-        dream_engine = DreamEngine(seed=seed, llm_client=self._llm)
-        cycle = SleepCycle(dream_engine=dream_engine, llm_client=self._llm)
+        # Create the sleep cycle (NeuralEngine shared from orchestrator)
+        dream_engine = DreamEngine(seed=seed, neural_engine=self._neural)
+        cycle = SleepCycle(dream_engine=dream_engine)
         self._sleep_cycle = cycle
         self._sleep_result = None
 
@@ -487,9 +507,9 @@ class Orchestrator:
         # Retrieve recent episodes
         episodes = self._relational.get_episodes(self._personality.being_id, limit=100)
 
-        # Run the sleep cycle (DreamEngine gets LLM for enhanced rollouts)
-        dream_engine = DreamEngine(seed=seed, llm_client=self._llm)
-        cycle = SleepCycle(dream_engine=dream_engine, llm_client=self._llm)
+        # Run the sleep cycle (NeuralEngine shared from orchestrator)
+        dream_engine = DreamEngine(seed=seed, neural_engine=self._neural)
+        cycle = SleepCycle(dream_engine=dream_engine)
         self._personality, result = cycle.run(
             self._personality,
             episodes,
