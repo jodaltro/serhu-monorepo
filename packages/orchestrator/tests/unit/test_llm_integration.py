@@ -287,35 +287,47 @@ class TestSleepCycleWithLLM:
         ]
         return llm
 
-    def test_llm_semantization_is_used_when_available(self):
-        llm_mock = self._make_llm_mock()
-        cycle = SleepCycle(
-            dream_engine=DreamEngine(seed=42),
-            llm_client=llm_mock,
-        )
+    def test_neural_semantization_is_used_when_trained(self):
+        """After NeuralEngine training, semantization uses learned patterns."""
+        cycle = SleepCycle(dream_engine=DreamEngine(seed=42))
 
-        episodes = [{"content": "Stars are beautiful"}]
-        facts = cycle._semantize(episodes, self._make_state())
+        episodes = [
+            {"content": "Stars are beautiful"},
+            {"content": "Stars are amazing"},
+        ]
+        state = self._make_state()
 
-        llm_mock.extract_semantic_facts.assert_called_once()
-        assert len(facts) == 2
-        assert "astronomy" in facts[0]
+        # Train the neural engine first
+        personality_vector = cycle._flatten_traits(state)
+        cycle.dream_engine.neural_engine.train(episodes, personality_vector)
 
-    def test_llm_belief_derivation_is_used_when_available(self):
-        llm_mock = self._make_llm_mock()
-        cycle = SleepCycle(
-            dream_engine=DreamEngine(seed=42),
-            llm_client=llm_mock,
-        )
+        facts = cycle._semantize(episodes, state)
+
+        # Neural engine should extract facts about 'stars'
+        assert len(facts) > 0
+        assert any("stars" in f.lower() for f in facts)
+
+    def test_neural_belief_derivation_is_used_when_trained(self):
+        """After NeuralEngine training, belief derivation uses learned patterns."""
+        cycle = SleepCycle(dream_engine=DreamEngine(seed=42))
+
+        episodes = [
+            {"content": "stars are important to me"},
+            {"content": "stars bring me peace"},
+        ]
+        state = self._make_state()
+
+        # Train the neural engine first
+        personality_vector = cycle._flatten_traits(state)
+        cycle.dream_engine.neural_engine.train(episodes, personality_vector)
 
         hypotheses = [
-            Hypothesis(action="stars_are_important", reward=0.8, complexity=0.1),
+            Hypothesis(action="hypothesis_about:stars important", reward=0.8, complexity=0.1),
         ]
-        beliefs = cycle._extract_beliefs(hypotheses, self._make_state())
+        beliefs = cycle._extract_beliefs(hypotheses, state)
 
-        llm_mock.derive_beliefs.assert_called_once()
-        assert len(beliefs) == 1
-        assert "universe" in beliefs[0]
+        assert len(beliefs) >= 1
+        assert any("Learned:" in b for b in beliefs)
 
     def test_llm_fallback_on_semantization_error(self):
         llm_mock = MagicMock()
@@ -350,20 +362,9 @@ class TestSleepCycleWithLLM:
         # Should fall back to rule-based
         assert any("Learned:" in b for b in beliefs)
 
-    def test_full_cycle_with_llm(self):
-        llm_mock = self._make_llm_mock()
-        llm_mock.generate_dream_hypotheses = MagicMock(return_value=[
-            "Stars are emotionally significant",
-            "The user values wonder and curiosity",
-        ])
-        llm_mock.simulate_dream_rollouts = MagicMock(return_value=[
-            {"action": "Stars are emotionally significant", "reward": 0.8, "complexity": 0.2},
-            {"action": "The user values wonder and curiosity", "reward": 0.7, "complexity": 0.3},
-        ])
-        cycle = SleepCycle(
-            dream_engine=DreamEngine(seed=42, llm_client=llm_mock),
-            llm_client=llm_mock,
-        )
+    def test_full_cycle_with_neural_engine(self):
+        """Full sleep cycle uses NeuralEngine for learning."""
+        cycle = SleepCycle(dream_engine=DreamEngine(seed=42))
 
         state = self._make_state()
         episodes = [
@@ -373,10 +374,12 @@ class TestSleepCycleWithLLM:
         new_state, result = cycle.run(state, episodes, num_rollouts=50, svd_rank=4)
 
         assert isinstance(result, SleepResult)
-        # LLM-extracted facts
-        assert "astronomy" in result.facts_extracted[0]
-        # LLM-derived beliefs
-        assert "universe" in result.beliefs_added[0]
+        # Neural-extracted facts
+        assert len(result.facts_extracted) > 0
+        assert any("stars" in f.lower() for f in result.facts_extracted)
+        # Training result is populated
+        assert result.training_result is not None
+        assert result.training_result.vocabulary_size > 0
         # SVD consolidation still works
         assert len(result.traits_before) == 72
         assert len(result.traits_after) == 72
@@ -402,9 +405,10 @@ class TestSleepCycleWithLLM:
 
 
 class TestOrchestratorChat:
-    """Tests for the LLM-powered chat method."""
+    """Tests for the self-learning chat method (no external LLM)."""
 
-    def test_chat_requires_llm_client(self):
+    def test_chat_works_without_llm_client(self):
+        """chat() now works without LLM – uses self-learning."""
         from serhu_orchestrator.orchestrator import Orchestrator
         from tests.e2e.conftest import InMemoryArchival, InMemoryRelational
 
@@ -420,21 +424,16 @@ class TestOrchestratorChat:
                 being_name="TestBeing",
             )
 
-            with pytest.raises(RuntimeError, match="chat.*requires.*LLM"):
-                orch.chat("Hello")
+            # Should not raise – chat works without LLM now
+            response, context = orch.chat("Hello")
+            assert isinstance(response, str)
+            assert len(response) > 0
+            assert len(context.working) >= 2  # user msg + being response
 
-    def test_chat_generates_response(self):
+    def test_chat_generates_self_learned_response(self):
+        """After sleep, chat generates responses from learned patterns."""
         from serhu_orchestrator.orchestrator import Orchestrator
         from tests.e2e.conftest import InMemoryArchival, InMemoryRelational
-
-        llm_mock = MagicMock()
-        llm_mock.chat.return_value = LLMResponse(
-            content="Hello! I am a newborn Being.",
-            model="gpt-5.4",
-        )
-        llm_mock.analyze_traits.return_value = {
-            "hexaco": {"sociability": 0.02},
-        }
 
         with (
             patch("serhu_orchestrator.orchestrator.ArchivalMemory", InMemoryArchival),
@@ -446,25 +445,27 @@ class TestOrchestratorChat:
                 supabase_url="mock://s",
                 supabase_key="k",
                 being_name="ChatBeing",
-                llm_client=llm_mock,
             )
 
-            response, context = orch.chat("Hello there!")
+            # Add some episodes first
+            for i in range(5):
+                orch.process_message("user", f"Nature is wonderful and beautiful {i}")
 
-            assert response == "Hello! I am a newborn Being."
-            llm_mock.chat.assert_called_once()
-            llm_mock.analyze_traits.assert_called_once()
-            # Trait was updated
-            assert orch.personality.hexaco.sociability == pytest.approx(0.52, abs=0.001)
-            # Both user and being messages stored
+            # Sleep to learn patterns
+            result = orch.sleep_once(num_rollouts=50, svd_rank=4, seed=42)
+            assert result.training_result is not None
+            assert result.training_result.vocabulary_size > 0
+
+            # Now chat should use learned patterns
+            response, context = orch.chat("Tell me about nature")
+            assert isinstance(response, str)
+            assert len(response) > 0
             assert len(context.working) >= 2
 
     def test_chat_without_auto_traits(self):
+        """chat with auto_traits=False skips trait extraction."""
         from serhu_orchestrator.orchestrator import Orchestrator
         from tests.e2e.conftest import InMemoryArchival, InMemoryRelational
-
-        llm_mock = MagicMock()
-        llm_mock.chat.return_value = LLMResponse(content="Response")
 
         with (
             patch("serhu_orchestrator.orchestrator.ArchivalMemory", InMemoryArchival),
@@ -476,23 +477,18 @@ class TestOrchestratorChat:
                 supabase_url="mock://s",
                 supabase_key="k",
                 being_name="NoTraitsBeing",
-                llm_client=llm_mock,
             )
 
             response, _ = orch.chat("Hello", auto_traits=False)
 
-            assert response == "Response"
-            llm_mock.analyze_traits.assert_not_called()
-            # Sociability should remain at default
+            assert isinstance(response, str)
+            # Sociability should remain at default (no auto-trait update)
             assert orch.personality.hexaco.sociability == 0.5
 
-    def test_chat_handles_trait_analysis_error(self):
+    def test_chat_auto_traits_no_crash(self):
+        """chat with auto_traits=True should not crash even without training."""
         from serhu_orchestrator.orchestrator import Orchestrator
         from tests.e2e.conftest import InMemoryArchival, InMemoryRelational
-
-        llm_mock = MagicMock()
-        llm_mock.chat.return_value = LLMResponse(content="Response")
-        llm_mock.analyze_traits.side_effect = Exception("API error")
 
         with (
             patch("serhu_orchestrator.orchestrator.ArchivalMemory", InMemoryArchival),
@@ -504,28 +500,16 @@ class TestOrchestratorChat:
                 supabase_url="mock://s",
                 supabase_key="k",
                 being_name="ErrorBeing",
-                llm_client=llm_mock,
             )
 
-            # Should not raise, just skip trait update
+            # Should not raise, even without trained neural engine
             response, _ = orch.chat("Hello")
-            assert response == "Response"
+            assert isinstance(response, str)
 
-    def test_sleep_with_llm_client(self):
+    def test_sleep_with_self_learning(self):
+        """Sleep cycle uses NeuralEngine for self-learning (no LLM)."""
         from serhu_orchestrator.orchestrator import Orchestrator
         from tests.e2e.conftest import InMemoryArchival, InMemoryRelational
-
-        llm_mock = MagicMock()
-        llm_mock.extract_semantic_facts.return_value = ["User loves nature"]
-        llm_mock.derive_beliefs.return_value = ["Nature is healing"]
-        llm_mock.generate_dream_hypotheses.return_value = [
-            "The user finds peace in nature",
-            "Nature imagery triggers positive emotions",
-        ]
-        llm_mock.simulate_dream_rollouts.return_value = [
-            {"action": "The user finds peace in nature", "reward": 0.8, "complexity": 0.2},
-            {"action": "Nature imagery triggers positive emotions", "reward": 0.7, "complexity": 0.3},
-        ]
 
         with (
             patch("serhu_orchestrator.orchestrator.ArchivalMemory", InMemoryArchival),
@@ -537,7 +521,6 @@ class TestOrchestratorChat:
                 supabase_url="mock://s",
                 supabase_key="k",
                 being_name="SleepBeing",
-                llm_client=llm_mock,
             )
 
             # Add some episodes
@@ -546,8 +529,10 @@ class TestOrchestratorChat:
 
             result = orch.sleep_once(num_rollouts=50, svd_rank=4, seed=42)
 
-            assert "User loves nature" in result.facts_extracted
-            assert "Nature is healing" in result.beliefs_added
+            assert any("nature" in f.lower() for f in result.facts_extracted)
+            assert len(result.beliefs_added) > 0
+            assert result.training_result is not None
+            assert result.training_result.vocabulary_size > 0
 
 
 # ---------------------------------------------------------------------------
@@ -555,45 +540,29 @@ class TestOrchestratorChat:
 # ---------------------------------------------------------------------------
 
 
-class TestDreamEngineWithLLM:
-    """Tests for LLM-enhanced dream rollouts."""
+class TestDreamEngineWithNeuralEngine:
+    """Tests for NeuralEngine-powered dream rollouts."""
 
-    def _make_llm_mock(self) -> MagicMock:
-        llm = MagicMock()
-        llm.generate_dream_hypotheses.return_value = [
-            "The user values honesty above comfort",
-            "Conversations about nature improve mood",
-            "The user seeks emotional validation",
+    def test_neural_hypotheses_generated(self):
+        """DreamEngine generates hypotheses from NeuralEngine patterns."""
+        engine = DreamEngine(seed=42)
+
+        history = [
+            {"content": "I love honesty and truth"},
+            {"content": "Honesty is the best policy"},
         ]
-        llm.simulate_dream_rollouts.return_value = [
-            {"action": "The user values honesty above comfort", "reward": 0.9, "complexity": 0.1},
-            {"action": "Conversations about nature improve mood", "reward": 0.7, "complexity": 0.2},
-            {"action": "The user seeks emotional validation", "reward": 0.6, "complexity": 0.3},
-        ]
-        return llm
-
-    def test_llm_hypotheses_generated(self):
-        llm_mock = self._make_llm_mock()
-        engine = DreamEngine(seed=42, llm_client=llm_mock)
-
-        history = [{"content": "I love honesty"}]
         personality = [0.5] * 72
         results = engine.perform_dream_rollouts(
             history, personality, num_rollouts=50, top_k=5,
-            personality_summary="Name: Test, Stage: sensorimotor",
         )
 
-        llm_mock.generate_dream_hypotheses.assert_called_once()
-        llm_mock.simulate_dream_rollouts.assert_called_once()
         assert len(results) == 5
-        # LLM hypotheses should be in the results
+        # Neural engine should generate pattern-based hypotheses
         actions = [h.action for h in results]
-        assert any("honesty" in a for a in actions)
+        assert any("honesty" in a.lower() for a in actions)
 
     def test_llm_fallback_on_error(self):
-        llm_mock = MagicMock()
-        llm_mock.generate_dream_hypotheses.side_effect = Exception("API error")
-        engine = DreamEngine(seed=42, llm_client=llm_mock)
+        engine = DreamEngine(seed=42)
 
         history = [{"content": "test content"}]
         personality = [0.5] * 72
@@ -606,10 +575,8 @@ class TestDreamEngineWithLLM:
         for h in results:
             assert isinstance(h, Hypothesis)
 
-    def test_llm_empty_hypotheses_falls_back(self):
-        llm_mock = MagicMock()
-        llm_mock.generate_dream_hypotheses.return_value = []
-        engine = DreamEngine(seed=42, llm_client=llm_mock)
+    def test_empty_history_still_works(self):
+        engine = DreamEngine(seed=42)
 
         history = [{"content": "test"}]
         personality = [0.5] * 72
@@ -633,9 +600,8 @@ class TestDreamEngineWithLLM:
         for h in results:
             assert isinstance(h, Hypothesis)
 
-    def test_llm_results_sorted_by_reward(self):
-        llm_mock = self._make_llm_mock()
-        engine = DreamEngine(seed=42, llm_client=llm_mock)
+    def test_results_sorted_by_reward(self):
+        engine = DreamEngine(seed=42)
 
         history = [{"content": "test"}]
         personality = [0.5] * 72

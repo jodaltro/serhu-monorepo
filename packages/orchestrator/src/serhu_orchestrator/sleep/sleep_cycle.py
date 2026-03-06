@@ -1,10 +1,12 @@
 """Sleep Cycle – Orchestrates the Being's offline processing phases.
 
 Implements a state-machine-like sleep cycle inspired by AWS Step Functions:
-1. **Semantization**  – Extract semantic facts from recent episodic memory.
-2. **Dream (REM)**    – AIXI rollouts to generate and evaluate hypotheses.
-3. **Consolidation (NREM)** – SVD dream pruning of personality vectors.
-4. **Ledger Update**  – Persist evolved personality and beliefs.
+1. **Training**       – NeuralEngine learns from episodic memories
+                        (transformer-inspired self-attention and pattern mining).
+2. **Semantization**  – Extract semantic facts using learned patterns.
+3. **Dream (REM)**    – AIXI rollouts to generate and evaluate hypotheses.
+4. **Consolidation (NREM)** – SVD dream pruning of personality vectors.
+5. **Ledger Update**  – Persist evolved personality and beliefs.
 
 The sleep cycle supports two execution modes:
 
@@ -15,16 +17,17 @@ The sleep cycle supports two execution modes:
   dream cycle, accumulating hypotheses, beliefs, and personality
   refinements across iterations.
 
-When an ``LLMClient`` is provided (e.g. ``OpenAIClient`` for GPT-5.4),
-phases 1 and 4 are enhanced with LLM-powered analysis.  Without an LLM
-client the original rule-based logic is used as fallback.
+The Being learns from its own experiences via the NeuralEngine –
+no external LLM dependency required.  The sleep cycle IS the Being's
+mechanism for building its own internal language model.
 
 References:
     - MemGPT semantization: https://informationmatters.org/2025/10/memgpt-engineering-semantic-memory/
     - AIXI: https://www.alignmentforum.org/w/aixi
     - Dream Pruning: https://pub.towardsai.net/dream-pruning-what-happens-when-ai-models-sleep-3db3c404e24a
     - Jungian reflection: https://arxiv.org/html/2601.10025v1
-    - GPT-5.4 integration: https://openai.com/index/introducing-gpt-5/
+    - Attention Is All You Need: https://arxiv.org/abs/1706.03762
+    - Self-supervised learning: https://arxiv.org/abs/2006.08218
 """
 
 from __future__ import annotations
@@ -35,6 +38,7 @@ from dataclasses import dataclass, field
 
 from serhu_orchestrator.personality.types import PersonalityState
 from serhu_orchestrator.sleep.dream_engine import DreamEngine, Hypothesis
+from serhu_orchestrator.sleep.neural_engine import NeuralEngine, TrainingResult
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +62,9 @@ class SleepResult:
     cycles_completed : int
         Number of AIXI dream cycles completed (≥1 for single-shot,
         potentially many for continuous mode).
+    training_result : TrainingResult | None
+        Metrics from the NeuralEngine training phase (vocabulary size,
+        pattern count, attention entropy).
     """
 
     facts_extracted: list[str] = field(default_factory=list)
@@ -66,6 +73,7 @@ class SleepResult:
     traits_before: list[float] = field(default_factory=list)
     traits_after: list[float] = field(default_factory=list)
     cycles_completed: int = 0
+    training_result: TrainingResult | None = None
 
 
 class SleepCycle:
@@ -73,22 +81,23 @@ class SleepCycle:
 
     Supports two execution modes:
 
-    - **Single-shot** (``run``): One complete semantization → dream →
-      consolidation → belief cycle.
+    - **Single-shot** (``run``): One complete training → semantization →
+      dream → consolidation → belief cycle.
     - **Continuous** (``run_continuous``): Loops indefinitely, running
       AIXI rollouts in every iteration, until ``request_stop()`` is
       called.  This models the AIXI ideal of an agent that never stops
       dreaming until external intervention.
+
+    The Being learns from its own experiences via the ``NeuralEngine`` –
+    no external LLM dependency.  The sleep cycle IS the mechanism for
+    building the Being's internal language model.
 
     Parameters
     ----------
     dream_engine : DreamEngine
         The engine for dream rollouts and SVD consolidation.
     llm_client : object | None
-        An object satisfying the ``LLMClient`` protocol (e.g. ``OpenAIClient``).
-        When provided, semantization and belief extraction are enhanced
-        with GPT-5.4 analysis.  When ``None``, the original rule-based
-        logic is used as fallback.
+        **Deprecated.** Ignored for backward compatibility.
     """
 
     # Canonical ordering of personality models for vector flattening.
@@ -101,7 +110,6 @@ class SleepCycle:
         llm_client: object | None = None,
     ) -> None:
         self.dream_engine = dream_engine or DreamEngine()
-        self._llm = llm_client
         self._stop_event = threading.Event()
 
     def request_stop(self) -> None:
@@ -141,11 +149,15 @@ class SleepCycle:
         """
         result = SleepResult()
 
-        # Phase 1: Semantization – extract facts from episodes
+        # Phase 0: Train NeuralEngine on episodes (self-learning)
+        personality_vector = self._flatten_traits(state)
+        neural = self.dream_engine.neural_engine
+        result.training_result = neural.train(episodes, personality_vector)
+
+        # Phase 1: Semantization – extract facts using learned patterns
         result.facts_extracted = self._semantize(episodes, state)
 
         # Phase 2: Dream (REM) – AIXI rollouts
-        personality_vector = self._flatten_traits(state)
         result.traits_before = list(personality_vector)
 
         result.hypotheses = self.dream_engine.perform_dream_rollouts(
@@ -212,7 +224,12 @@ class SleepCycle:
         if self._stop_event.is_set():
             return state, result
 
-        # Phase 1 (once): Semantization – extract facts from episodes
+        # Phase 0 (once): Train NeuralEngine on episodes
+        personality_vector = self._flatten_traits(state)
+        neural = self.dream_engine.neural_engine
+        result.training_result = neural.train(episodes, personality_vector)
+
+        # Phase 1 (once): Semantization – extract facts using learned patterns
         result.facts_extracted = self._semantize(episodes, state)
 
         # Record initial traits
@@ -266,16 +283,17 @@ class SleepCycle:
     ) -> list[str]:
         """Extract semantic facts from episodic memory (Twilight phase).
 
-        When an LLM client is available, uses GPT-5.4 for rich semantic
-        extraction.  Otherwise falls back to rule-based keyword analysis.
+        Uses the NeuralEngine's learned patterns to extract semantic facts.
+        Falls back to rule-based keyword analysis if neural extraction fails.
         """
-        if self._llm is not None:
+        neural = self.dream_engine.neural_engine
+        if neural.is_trained:
             try:
-                personality_summary = self._build_personality_summary(state)
-                return self._llm.extract_semantic_facts(episodes, personality_summary)
+                personality_vector = self._flatten_traits(state)
+                return neural.extract_semantic_facts(episodes, personality_vector)
             except Exception:
                 logger.warning(
-                    "LLM semantization failed, falling back to rule-based",
+                    "Neural semantization failed, falling back to rule-based",
                     exc_info=True,
                 )
 
@@ -332,20 +350,22 @@ class SleepCycle:
     ) -> list[str]:
         """Derive new core beliefs from the top dream hypotheses.
 
-        When an LLM client is available, uses GPT-5.4 for Jungian
-        reflection.  Otherwise falls back to the rule-based mechanism.
+        Uses the NeuralEngine's pattern analysis to evaluate which
+        hypotheses should become permanent beliefs.  Falls back to
+        the rule-based mechanism if neural analysis is unavailable.
 
         Reference: https://arxiv.org/html/2601.10025v1
         """
-        if self._llm is not None:
+        neural = self.dream_engine.neural_engine
+        if neural.is_trained:
             try:
-                if any(h.reward > 0.0 for h in hypotheses[:10]):
-                    hypothesis_texts = [h.action for h in hypotheses[:10] if h.reward > 0.0]
-                    personality_summary = self._build_personality_summary(state)
-                    return self._llm.derive_beliefs(hypothesis_texts, personality_summary)
+                hypothesis_texts = [h.action for h in hypotheses[:10] if h.reward > 0.0]
+                if hypothesis_texts:
+                    personality_vector = self._flatten_traits(state)
+                    return neural.derive_beliefs(hypothesis_texts, personality_vector)
             except Exception:
                 logger.warning(
-                    "LLM belief derivation failed, falling back to rule-based",
+                    "Neural belief derivation failed, falling back to rule-based",
                     exc_info=True,
                 )
 

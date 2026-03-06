@@ -3,9 +3,10 @@
 Implements the two core sleep phases:
 1. **REM (Dreaming)**: Monte-Carlo AIXI-CTW rollouts that generate
    hypothetical future interactions, scored by coherence.
-   When an ``LLMClient`` is provided, hypothesis generation is enhanced
-   via Solomonoff Induction (LLM discovers algorithmic patterns) and
-   rollouts are simulated as projected future conversations.
+   When a ``NeuralEngine`` is available, hypothesis generation uses
+   transformer-inspired self-attention and pattern mining over episodic
+   data (Solomonoff Induction without external LLM).  Otherwise, the
+   engine uses random Monte-Carlo rollouts.
 2. **NREM (Consolidation)**: SVD rank-reduction applied to personality
    trait vectors, eliminating noise and crystallising intuition.
 
@@ -15,7 +16,8 @@ References:
     - Solomonoff induction: https://www.amazon.science/blog/solomonic-learning-large-language-models-and-the-art-of-induction
     - Dream Pruning / SVD: https://pub.towardsai.net/dream-pruning-what-happens-when-ai-models-sleep-3db3c404e24a
     - Dream2Learn: https://arxiv.org/html/2603.01935v1
-    - LLM as universal solver: https://arxiv.org/html/2507.21065v1
+    - Self-supervised learning: https://arxiv.org/abs/2006.08218
+    - Attention Is All You Need: https://arxiv.org/abs/1706.03762
 """
 
 from __future__ import annotations
@@ -24,6 +26,9 @@ import logging
 import math
 import random
 from dataclasses import dataclass, field
+
+
+from serhu_orchestrator.sleep.neural_engine import NeuralEngine, TrainingResult
 
 
 logger = logging.getLogger(__name__)
@@ -51,27 +56,47 @@ class Hypothesis:
 class DreamEngine:
     """Generates dream hypotheses and consolidates personality via SVD.
 
-    When an ``LLMClient`` is provided, hypothesis generation uses
-    Solomonoff Induction (LLM-powered pattern discovery) and rollouts
-    simulate projected future conversations.  Without an LLM client,
-    the engine falls back to random Monte-Carlo rollouts.
+    When a ``NeuralEngine`` is available (default), hypothesis generation
+    uses transformer-inspired self-attention and pattern mining over
+    episodic data (Solomonoff Induction without external LLM).  The
+    NeuralEngine builds an internal language model from the Being's own
+    experiences during sleep.
+
+    Without a NeuralEngine, the engine uses random Monte-Carlo rollouts.
 
     Parameters
     ----------
     seed : int | None
         Random seed for reproducible dream rollouts.
+    neural_engine : NeuralEngine | None
+        Transformer-inspired self-learning engine.  When provided, enables
+        pattern-based hypothesis generation from episodic data.
+        A new engine is created automatically if not provided.
     llm_client : object | None
-        An object satisfying the ``LLMClient`` protocol (e.g. ``OpenAIClient``).
-        Enables LLM-powered hypothesis generation and dream simulation.
+        **Deprecated.** Ignored for backward compatibility.  The Being
+        now learns from its own experiences via the NeuralEngine.
     """
 
     def __init__(
         self,
         seed: int | None = None,
+        neural_engine: NeuralEngine | None = None,
+        *,
         llm_client: object | None = None,
     ) -> None:
         self._rng = random.Random(seed)
-        self._llm = llm_client
+        self._neural = neural_engine or NeuralEngine(seed=seed)
+        self._training_result: TrainingResult | None = None
+
+    @property
+    def neural_engine(self) -> NeuralEngine:
+        """The internal NeuralEngine used for self-learning."""
+        return self._neural
+
+    @property
+    def last_training_result(self) -> TrainingResult | None:
+        """Result of the most recent neural training cycle."""
+        return self._training_result
 
     # -- REM phase: AIXI rollouts -------------------------------------------
 
@@ -86,15 +111,13 @@ class DreamEngine:
     ) -> list[Hypothesis]:
         """Simulate future interactions using MC-AIXI-CTW-inspired rollouts.
 
-        When an LLM client is available, hypothesis generation is enhanced:
-        1. **Solomonoff Induction**: The LLM discovers algorithmic patterns
-           in the episodic data, producing meaningful hypotheses.
-        2. **Dream Simulation**: The LLM projects future conversations to
-           test how the consolidated personality would react.
+        The NeuralEngine trains on episodic data and generates hypotheses:
+        1. **Self-Attention Training**: Builds TF-IDF vocabulary and
+           attention matrix over episodes (transformer-inspired).
+        2. **Pattern-Based Hypotheses**: Generates hypotheses from learned
+           n-gram patterns and attention clusters.
         3. **Random Diversity**: Remaining rollout slots are filled with
            random Monte-Carlo hypotheses for exploration breadth.
-
-        Without an LLM, all rollouts use the original random approach.
 
         Parameters
         ----------
@@ -107,8 +130,7 @@ class DreamEngine:
         top_k : int
             Number of best hypotheses to retain.
         personality_summary : str
-            Compact personality summary for LLM context (only used when
-            an LLM client is available).
+            Compact personality summary (unused, kept for backward compat).
 
         Returns
         -------
@@ -117,18 +139,28 @@ class DreamEngine:
         """
         hypotheses: list[Hypothesis] = []
 
-        # Phase 1: LLM-enhanced hypotheses (Solomonoff Induction + simulation)
-        if self._llm is not None:
-            try:
-                llm_hypotheses = self._llm_enhanced_rollouts(
-                    history, personality_vector, personality_summary, top_k
+        # Phase 1: NeuralEngine-powered hypotheses (self-learning)
+        try:
+            self._training_result = self._neural.train(history, personality_vector)
+            neural_hypothesis_texts = self._neural.generate_hypotheses(
+                history, personality_vector, num_hypotheses=top_k
+            )
+            # Score each neural hypothesis using the learned model
+            for h_text in neural_hypothesis_texts:
+                h_tokens = set(self._neural._tokenize_text(h_text))
+                vocab_support = sum(
+                    self._neural._vocabulary.get(t, 0.0) for t in h_tokens
                 )
-                hypotheses.extend(llm_hypotheses)
-            except Exception:
-                logger.warning(
-                    "LLM dream rollouts failed, falling back to random",
-                    exc_info=True,
+                complexity = len(h_text) / 200.0
+                reward = vocab_support - math.log(complexity + 1.0)
+                hypotheses.append(
+                    Hypothesis(action=h_text, reward=reward, complexity=complexity)
                 )
+        except Exception:
+            logger.warning(
+                "Neural engine training failed, using random rollouts only",
+                exc_info=True,
+            )
 
         # Phase 2: Fill remaining slots with random Monte-Carlo rollouts
         remaining = max(num_rollouts - len(hypotheses), 0)
@@ -141,59 +173,6 @@ class DreamEngine:
         # Return the top-k hypotheses (Ockham: prefer simple + high-reward)
         hypotheses.sort(key=lambda h: h.reward, reverse=True)
         return hypotheses[:top_k]
-
-    def _llm_enhanced_rollouts(
-        self,
-        history: list[dict],
-        personality_vector: list[float],
-        personality_summary: str,
-        top_k: int,
-    ) -> list[Hypothesis]:
-        """Generate and evaluate hypotheses using the LLM.
-
-        1. Solomonoff Induction: LLM generates pattern-based hypotheses.
-        2. Dream Simulation: LLM evaluates coherence of each hypothesis.
-        """
-        context_signal = self._extract_context_signal(history)
-
-        # Step 1: Generate hypotheses via Solomonoff Induction
-        raw_hypotheses = self._llm.generate_dream_hypotheses(
-            episodes=history,
-            personality_summary=personality_summary,
-            num_hypotheses=top_k,
-        )
-
-        if not raw_hypotheses:
-            return []
-
-        # Step 2: Simulate and score via dream rollouts
-        scored = self._llm.simulate_dream_rollouts(
-            hypotheses=raw_hypotheses,
-            personality_summary=personality_summary,
-            recent_context=context_signal,
-        )
-
-        # Convert to Hypothesis objects
-        results: list[Hypothesis] = []
-        for item in scored:
-            action = item.get("action", "")
-            reward = float(item.get("reward", 0.0))
-            complexity = float(item.get("complexity", 0.0))
-            # Solomonoff-inspired: reward = coherence - log(complexity + 1)
-            adjusted_reward = reward - math.log(complexity + 1.0)
-            results.append(
-                Hypothesis(action=action, reward=adjusted_reward, complexity=complexity)
-            )
-
-        # Also create Hypothesis objects from raw hypotheses not in scored
-        scored_actions = {item.get("action", "") for item in scored}
-        for h_text in raw_hypotheses:
-            if h_text not in scored_actions:
-                results.append(
-                    Hypothesis(action=h_text, reward=0.1, complexity=0.5)
-                )
-
-        return results
 
     def _random_rollouts(
         self,

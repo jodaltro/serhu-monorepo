@@ -305,9 +305,10 @@ class TestVisualState:
         assert v2["roundness"] > v1["roundness"]
 
 
-class TestChatWithoutLLM:
+class TestChatWithSelfLearning:
 
-    def test_chat_without_llm_returns_503(self, client):
+    def test_chat_without_llm_returns_200(self, client):
+        """Chat now works without external LLM (self-learning)."""
         create_resp = client.post("/beings", json={"name": "Luna"})
         being_id = create_resp.json()["being_id"]
 
@@ -315,5 +316,8 @@ class TestChatWithoutLLM:
             f"/beings/{being_id}/chat",
             json={"message": "Hello!"},
         )
-        # Without an LLM client, chat should return 503
-        assert resp.status_code == 503
+        # Without an LLM client, chat now uses self-learning (NeuralEngine)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "response" in data
+        assert isinstance(data["response"], str)
