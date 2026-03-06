@@ -352,8 +352,15 @@ response, context = orch.chat("Me conte sobre a natureza")
 Orchestrator.chat(user_message)
   → MemoryManager.add_interaction("user", message)
   → _stage_llm_params(stage, age)  # max_tokens e temperature por estágio
-  → NeuralEngine.generate_response(context, personality_vector, max_tokens)
+  → [Phase -1] OnlinePlanner.plan_and_act()  # Se WorldModel disponível (pós-sleep)
+    → Gera K candidatos via NeuralEngine.generate_response()
+    → Mapeia cada candidato para ação AIXI mais próxima
+    → Avalia cada candidato com mini-rollouts (AixiEnvironment)
+    → Escolhe candidato com maior reward esperado
+  → [Fallback] NeuralEngine.generate_response()  # Se sem WorldModel
   → MemoryManager.add_interaction("being", response)
+  → OnlinePlanner.compute_real_reward()  # Reward real pós-turno
+  → OnlinePlanner.record_experience()  # Registra experiência para calibração
   → _extract_trait_deltas_from_interaction()  # Extrai deltas via TF-IDF
   → PersonalityEngine.update_traits(state, deltas)  # Aplica evolução
 
@@ -370,6 +377,63 @@ Orchestrator.sleep()
     → _extract_beliefs(hypotheses, state)
       → NeuralEngine.derive_beliefs(hypothesis_texts, personality_vector)
       → fallback: _rule_based_extract_beliefs(hypotheses)
+  → Persiste WorldModel + EnvironmentSpec para uso online  # ← NOVO
+```
+
+## **Planejamento Online (Phase -1): AIXI em Tempo Real**
+
+O sono melhora o WorldModel; o chat *usa*. Antes de responder, o Ser executa mini-rollouts AIXI para avaliar candidatos e escolher a melhor ação — transformando simulações offline em decisões online.
+
+### **Arquitetura do OnlinePlanner**
+
+O módulo `sleep/online_planner.py` implementa o planejamento online:
+
+| Fase | Técnica | Função |
+| :---- | :---- | :---- |
+| **Geração de Candidatos** | NeuralEngine.generate_response() × K variantes | Produz K respostas diversas via perturbação estocástica |
+| **Mapeamento de Ações** | Token overlap com EnvironmentSpec.actions | Associa cada candidato à ação AIXI mais relevante |
+| **Mini-Rollouts** | AixiEnvironment.step() × N rollouts por candidato | Avalia reward esperado via Monte-Carlo curto |
+| **Seleção** | argmax(expected_reward) | Escolhe o candidato com maior reward |
+| **Experiência** | record_experience(action, observation, real_reward) | Registra resultado real para calibração futura |
+
+### **Quando o Planner Atua**
+
+- **Sem WorldModel (pré-sleep):** O planner é ignorado. `chat()` usa NeuralEngine diretamente.
+- **Com WorldModel (pós-sleep):** O planner gera candidatos, avalia com mini-rollouts, e escolhe o melhor.
+- **Custo computacional:** K=5 candidatos × N=10 rollouts × horizon=3 = 150 steps (leve).
+
+### **Experiência e Reward Real**
+
+Após cada turno, `compute_real_reward()` calcula um reward baseado em:
+- **Engagement** (0.3): tamanho da resposta relativo ao contexto.
+- **Relevance** (0.4): overlap de tokens com a mensagem do usuário.
+- **Signal alignment** (0.3): match com reward_signals do EnvironmentSpec.
+
+A experiência é registrada com `record_experience()` para calibração do planner.
+
+### **Exemplo de Uso**
+
+```python
+from serhu_orchestrator.orchestrator import Orchestrator
+
+orch = Orchestrator(being_name="Luna", language="pt", ...)
+
+# Fase 1: interações iniciais (sem WorldModel, planner inativo)
+orch.process_message("user", "As estrelas são lindas")
+orch.chat("Me conte sobre o universo")  # usa NeuralEngine diretamente
+
+# Fase 2: sono (constrói WorldModel)
+orch.sleep_once(num_rollouts=100, svd_rank=8)
+assert orch.has_world_model  # WorldModel disponível!
+
+# Fase 3: chat com planejamento online (Phase -1 ativo)
+response, ctx = orch.chat("O que você sabe sobre estrelas?")
+# → Planner gera 5 candidatos, avalia com mini-rollouts, escolhe o melhor
+# → Experiência real registrada automaticamente
+
+# Acessar experiências registradas
+exp = orch.online_planner.experiences[-1]
+print(f"Reward real: {exp.reward}, Reward planejado: {exp.planned_reward}")
 ```
 
 ## **Evolução Progressiva da Linguagem: Stage-Aware Prompting**
