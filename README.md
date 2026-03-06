@@ -92,6 +92,23 @@ subsequent rollouts run autonomously.
 | **Dream (REM)** | MC-AIXI rollouts against `AixiEnvironment` (reset/step interface) | Generate hypotheses via environment simulation with discounted rewards |
 | **Consolidation (NREM)** | SVD rank-reduction | Noise removal from personality vector |
 | **Ledger Update** | NeuralEngine belief derivation + belief stack + persist | Derive beliefs from dreams, store evolved traits |
+| **WorldModel Persist** | Store EnvironmentSpec + WorldModel in Orchestrator | Enable online planning during subsequent chat turns |
+
+### Online Planning (Phase -1 — Real-Time Action Selection)
+
+After at least one sleep cycle, the Being uses the consolidated WorldModel
+during `chat()` to evaluate candidate responses via short AIXI rollouts:
+
+| Step | Mechanism | Description |
+|---|---|---|
+| **Generate** | NeuralEngine × K variants | Produce K diverse response candidates |
+| **Map** | Token overlap matching | Associate each candidate with closest AIXI action |
+| **Evaluate** | AixiEnvironment mini-rollouts | Score each candidate via Monte-Carlo simulation |
+| **Select** | argmax(expected_reward) | Choose the candidate with highest expected reward |
+| **Record** | Experience logging | Store real reward post-turn for calibration |
+
+If no WorldModel is available (pre-sleep), the planner is skipped and `chat()`
+falls back to direct NeuralEngine response generation.
 
 ### Event Sourcing
 
@@ -130,6 +147,7 @@ generated in the Being's language via `i18n.py`.
 | **dream_engine** | `sleep/dream_engine.py` | AIXI rollouts against `AixiEnvironment` (reset/step) + SVD dream pruning |
 | **sleep_cycle** | `sleep/sleep_cycle.py` | Full sleep orchestration (environment build → training → semantize → REM → NREM → ledger) |
 | **aixi_environment** | `sleep/aixi_environment.py` | RL-like AIXI environment (EnvironmentSpec, WorldModel, AixiEnvironment, EnvironmentBuilder) |
+| **online_planner** | `sleep/online_planner.py` | Real-time AIXI mini-rollouts for action selection during chat (Phase -1) |
 
 ## Setup
 
@@ -229,7 +247,7 @@ python -m pytest packages/grpc_server/tests/unit -v
 # Integration tests (requires Qdrant + Supabase credentials in .env)
 python -m pytest packages/orchestrator/tests/integration -v -m integration
 
-# ALL tests (369 Python + 9 JS, no external services)
+# ALL tests (395 Python + 9 JS, no external services)
 python -m pytest packages/orchestrator/tests/unit packages/orchestrator/tests/e2e \
   packages/morphogenesis/tests/unit packages/api/tests/unit \
   packages/grpc_server/tests/unit -v
