@@ -80,7 +80,7 @@ class TrainingResult:
     top_patterns: list[str] = field(default_factory=list)
 
 
-# Stop words for filtering (minimal set, language-agnostic)
+# Stop words for filtering (minimal set, covers EN, PT, ES, FR)
 _STOP_WORDS = frozenset({
     "a", "an", "the", "is", "are", "was", "were", "be", "been", "being",
     "have", "has", "had", "do", "does", "did", "will", "would", "shall",
@@ -101,6 +101,17 @@ _STOP_WORDS = frozenset({
 
 # Minimum token length to consider meaningful
 _MIN_TOKEN_LEN = 2
+
+# Named indices into the 72-dim personality vector
+# HEXACO (24): [0..23], TCI-T (16): [24..39], TCI-C (13): [40..52], Schwartz (19): [53..71]
+_OPENNESS_INDEX = 20        # HEXACO Openness: aesthetic_appreciation
+_CONSCIENTIOUSNESS_INDEX = 16  # HEXACO Conscientiousness: organization
+_CURIOSITY_INDEX = 24        # TCI-T: exploratory_excitability (Novelty Seeking)
+
+# Maximum number of n-grams to retain per type
+_MAX_BIGRAMS = 500
+_MAX_TRIGRAMS = 200
+_MAX_UNIGRAMS = 100
 
 
 class NeuralEngine:
@@ -147,6 +158,24 @@ class NeuralEngine:
     @property
     def pattern_count(self) -> int:
         return len(self._patterns)
+
+    def tokenize(self, text: str) -> list[str]:
+        """Tokenize text into cleaned, filtered tokens (public API)."""
+        return self._tokenize_text(text)
+
+    def get_token_weight(self, token: str) -> float:
+        """Get the TF-IDF weight of a token, or 0.0 if unknown."""
+        return self._vocabulary.get(token.lower(), 0.0)
+
+    def get_significant_tokens(
+        self, tokens: list[str], threshold: float = 0.05
+    ) -> list[tuple[str, float]]:
+        """Return tokens with TF-IDF weight above the threshold."""
+        return [
+            (t, self._vocabulary.get(t, 0.0))
+            for t in tokens
+            if self._vocabulary.get(t, 0.0) > threshold
+        ]
 
     # -- Training (the core sleep learning mechanism) -----------------------
 
@@ -608,7 +637,7 @@ class NeuralEngine:
 
         # Apply personality modulation: boost scores for episodes
         # that align with high personality traits
-        openness_boost = personality_vector[20] if len(personality_vector) > 20 else 0.5
+        openness_boost = personality_vector[_OPENNESS_INDEX] if len(personality_vector) > _OPENNESS_INDEX else 0.5
         curiosity_factor = 0.5 + openness_boost * 0.5
 
         # Softmax normalization per row
@@ -639,22 +668,24 @@ class NeuralEngine:
                 trigram = (tokens[j], tokens[j + 1], tokens[j + 2])
                 trigram_counts[trigram] += 1
 
-        # Store weighted bigrams
+        # Store weighted bigrams (limited to top-k for memory efficiency)
         max_bg_count = max(bigram_counts.values()) if bigram_counts else 1
         self._bigrams = {
-            bg: count / max_bg_count for bg, count in bigram_counts.items()
+            bg: count / max_bg_count
+            for bg, count in bigram_counts.most_common(_MAX_BIGRAMS)
         }
 
-        # Store weighted trigrams
+        # Store weighted trigrams (limited to top-k)
         max_tg_count = max(trigram_counts.values()) if trigram_counts else 1
         self._trigrams = {
-            tg: count / max_tg_count for tg, count in trigram_counts.items()
+            tg: count / max_tg_count
+            for tg, count in trigram_counts.most_common(_MAX_TRIGRAMS)
         }
 
-        # Create LearnedPattern objects from n-grams
+        # Create LearnedPattern objects from top n-grams
         patterns: list[LearnedPattern] = []
 
-        for (t1, t2), weight in bigram_counts.most_common(100):
+        for (t1, t2), weight in bigram_counts.most_common(min(100, _MAX_BIGRAMS)):
             source_eps: list[int] = []
             for i, tokens in enumerate(episode_tokens):
                 for j in range(len(tokens) - 1):
@@ -668,7 +699,7 @@ class NeuralEngine:
                 source_episodes=source_eps,
             ))
 
-        for (t1, t2, t3), weight in trigram_counts.most_common(50):
+        for (t1, t2, t3), weight in trigram_counts.most_common(min(50, _MAX_TRIGRAMS)):
             source_eps = []
             for i, tokens in enumerate(episode_tokens):
                 for j in range(len(tokens) - 2):
@@ -685,7 +716,7 @@ class NeuralEngine:
         # Also add single high-TF-IDF tokens as unigram patterns
         for token, weight in sorted(
             self._vocabulary.items(), key=lambda x: x[1], reverse=True
-        )[:30]:
+        )[:_MAX_UNIGRAMS]:
             freq = sum(1 for tokens in episode_tokens if token in tokens)
             patterns.append(LearnedPattern(
                 tokens=[token],
@@ -712,9 +743,9 @@ class NeuralEngine:
             return
 
         # Extract personality dimensions for modulation
-        openness = personality_vector[20] if len(personality_vector) > 20 else 0.5
-        conscientiousness = personality_vector[16] if len(personality_vector) > 16 else 0.5
-        curiosity = personality_vector[24] if len(personality_vector) > 24 else 0.5
+        openness = personality_vector[_OPENNESS_INDEX] if len(personality_vector) > _OPENNESS_INDEX else 0.5
+        conscientiousness = personality_vector[_CONSCIENTIOUSNESS_INDEX] if len(personality_vector) > _CONSCIENTIOUSNESS_INDEX else 0.5
+        curiosity = personality_vector[_CURIOSITY_INDEX] if len(personality_vector) > _CURIOSITY_INDEX else 0.5
 
         for p in self._patterns:
             base_weight = p.weight
@@ -845,7 +876,7 @@ class NeuralEngine:
     ) -> list[str]:
         """Generate hypotheses through personality-modulated exploration."""
         hypotheses: list[str] = []
-        openness = personality_vector[20] if len(personality_vector) > 20 else 0.5
+        openness = personality_vector[_OPENNESS_INDEX] if len(personality_vector) > _OPENNESS_INDEX else 0.5
 
         # Select random episodes weighted by attention entropy
         for _ in range(count):

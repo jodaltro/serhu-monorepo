@@ -286,23 +286,22 @@ class Orchestrator:
 
         # Simple heuristic: words with high TF-IDF in the conversation
         # suggest topics the user cares about, which shapes the Being
-        tokens = NeuralEngine._tokenize_text(user_message)
+        tokens = self._neural.tokenize(user_message)
         if not tokens:
             return None
 
         # Check vocabulary support for each token
-        significant_tokens = [
-            (t, self._neural._vocabulary.get(t, 0.0))
-            for t in tokens
-            if self._neural._vocabulary.get(t, 0.0) > 0.05
-        ]
+        significant_tokens = self._neural.get_significant_tokens(tokens, threshold=0.05)
 
         if not significant_tokens:
             return None
 
         # Map high-weight tokens to small trait nudges
-        delta = 0.01 * len(significant_tokens) / max(len(tokens), 1)
-        delta = min(delta, 0.05)
+        # Base delta scaled by proportion of significant tokens, capped at 0.05
+        _TRAIT_DELTA_BASE = 0.01
+        _TRAIT_DELTA_MAX = 0.05
+        delta = _TRAIT_DELTA_BASE * len(significant_tokens) / max(len(tokens), 1)
+        delta = min(delta, _TRAIT_DELTA_MAX)
 
         return {
             "tci_character": {
