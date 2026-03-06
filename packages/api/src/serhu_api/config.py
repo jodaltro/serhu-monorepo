@@ -49,6 +49,10 @@ class Settings(BaseSettings):
     # -- API server ----------------------------------------------------------
     api_host: str = Field(default="0.0.0.0", description="API listen host")
     api_port: int = Field(default=8000, description="API listen port")
+    cors_origins: str = Field(
+        default="http://localhost:3000",
+        description="Comma-separated list of allowed CORS origins",
+    )
 
     model_config = {
         "env_file": ".env",

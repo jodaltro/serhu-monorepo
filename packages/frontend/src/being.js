@@ -97,7 +97,7 @@ export function createBeing(scene) {
 
       // Spherical coordinates for noise sampling
       const theta = Math.atan2(ny, nx);
-      const phi = Math.acos(nz / len);
+      const phi = Math.acos(Math.min(1, Math.max(-1, nz)));
 
       // Spike displacement: sharper extrusion at certain vertices
       // Use a mix of harmonics for organic spikiness

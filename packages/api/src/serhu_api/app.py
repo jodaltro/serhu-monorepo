@@ -15,6 +15,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from serhu_api.routes import health, beings
+from serhu_api.config import Settings
 from serhu_api.dependencies import clear_cache
 
 
@@ -41,10 +42,12 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(beings.router)
 
-    # CORS — allow the Three.js dev server (Vite) to talk to the API.
+    # CORS — origins configurable via CORS_ORIGINS env var.
+    settings = Settings()
+    origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:3000"],
+        allow_origins=origins,
         allow_methods=["*"],
         allow_headers=["*"],
     )

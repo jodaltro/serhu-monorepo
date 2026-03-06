@@ -82,7 +82,7 @@ async function startScene(info) {
       } catch {
         // No LLM available: use manual process and return placeholder
         await api.processMessage(beingId, "user", message);
-        return { response: "…" };
+        return { response: "✦" };
       }
     },
     onAfterSend: refreshVisualState,

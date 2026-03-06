@@ -5,7 +5,7 @@
  * or same-origin in production).
  */
 
-const BASE = "";
+const BASE = import.meta.env.VITE_API_BASE ?? "";
 
 /**
  * @typedef {Object} BeingInfo
