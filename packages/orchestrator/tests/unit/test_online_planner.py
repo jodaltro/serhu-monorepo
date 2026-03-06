@@ -9,6 +9,7 @@ from serhu_orchestrator.sleep.online_planner import (
 )
 from serhu_orchestrator.sleep.aixi_environment import EnvironmentSpec, WorldModel
 from serhu_orchestrator.sleep.neural_engine import NeuralEngine
+from serhu_orchestrator.sleep.value_model import ValueModel
 
 
 # -- helpers -----------------------------------------------------------------
@@ -385,3 +386,111 @@ class TestOnlinePlannerCandidateEvaluation:
         # The specific values differ based on reward signals
         assert isinstance(reward_explore, float)
         assert isinstance(reward_reflect, float)
+
+
+# ---------------------------------------------------------------------------
+# ValueModel pre-screening tests
+# ---------------------------------------------------------------------------
+
+
+class TestOnlinePlannerValueModelPrescreen:
+    """Tests for ValueModel-based pre-screening in plan_and_act."""
+
+    def _make_value_model(self) -> ValueModel:
+        """Create a trained ValueModel for testing."""
+        vm = ValueModel(learning_rate=0.1)
+        pairs = [
+            ([0.5] * 72, "respond_empathically"),
+            ([0.5] * 72, "ask_question"),
+            ([0.5] * 72, "explore_topic"),
+            ([0.5] * 72, "discuss_stars"),
+            ([0.5] * 72, "reflect_on_self"),
+        ]
+        targets = [0.9, 0.7, 0.5, 0.3, 0.1]
+        vm.fit(pairs, targets, epochs=50)
+        return vm
+
+    def test_plan_with_value_model(self):
+        """plan_and_act should work with a ValueModel for pre-screening."""
+        engine = _trained_engine()
+        planner = OnlinePlanner(
+            engine, num_candidates=5, rollouts_per_candidate=5, seed=42
+        )
+        spec = _make_spec()
+        wm = _make_world_model()
+        vm = self._make_value_model()
+
+        result = planner.plan_and_act(
+            context=["Tell me about stars"],
+            personality_vector=_personality_vector(),
+            environment_spec=spec,
+            world_model=wm,
+            max_tokens=10,
+            value_model=vm,
+        )
+
+        assert isinstance(result, PlanResult)
+        assert result.chosen_response != ""
+
+    def test_plan_without_value_model_backward_compatible(self):
+        """plan_and_act should work without a ValueModel (None)."""
+        engine = _trained_engine()
+        planner = OnlinePlanner(
+            engine, num_candidates=3, rollouts_per_candidate=5, seed=42
+        )
+        spec = _make_spec()
+        wm = _make_world_model()
+
+        result = planner.plan_and_act(
+            context=["Tell me about stars"],
+            personality_vector=_personality_vector(),
+            environment_spec=spec,
+            world_model=wm,
+            max_tokens=10,
+            value_model=None,
+        )
+
+        assert isinstance(result, PlanResult)
+        assert result.chosen_response != ""
+
+    def test_plan_with_untrained_value_model(self):
+        """An untrained ValueModel should be skipped (no pre-screening)."""
+        engine = _trained_engine()
+        planner = OnlinePlanner(
+            engine, num_candidates=3, rollouts_per_candidate=5, seed=42
+        )
+        spec = _make_spec()
+        wm = _make_world_model()
+        vm = ValueModel()  # Not trained
+
+        result = planner.plan_and_act(
+            context=["Tell me about stars"],
+            personality_vector=_personality_vector(),
+            environment_spec=spec,
+            world_model=wm,
+            max_tokens=10,
+            value_model=vm,
+        )
+
+        assert isinstance(result, PlanResult)
+
+    def test_plan_value_model_returns_all_rewards(self):
+        """All candidates should have rewards (rollout or predicted)."""
+        engine = _trained_engine()
+        planner = OnlinePlanner(
+            engine, num_candidates=5, rollouts_per_candidate=5, seed=42
+        )
+        spec = _make_spec()
+        wm = _make_world_model()
+        vm = self._make_value_model()
+
+        result = planner.plan_and_act(
+            context=["Tell me about the universe and stars"],
+            personality_vector=_personality_vector(),
+            environment_spec=spec,
+            world_model=wm,
+            max_tokens=10,
+            value_model=vm,
+        )
+
+        assert len(result.all_rewards) == result.candidates_evaluated

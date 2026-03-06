@@ -47,6 +47,7 @@ from serhu_orchestrator.sleep.sleep_cycle import SleepCycle, SleepResult
 from serhu_orchestrator.sleep.neural_engine import NeuralEngine
 from serhu_orchestrator.sleep.online_planner import OnlinePlanner, PlanResult
 from serhu_orchestrator.sleep.aixi_environment import EnvironmentSpec, WorldModel
+from serhu_orchestrator.sleep.value_model import ValueModel
 
 logger = logging.getLogger(__name__)
 
@@ -143,6 +144,7 @@ class Orchestrator:
         # -- online planner (uses last consolidated WorldModel) --------------
         self._last_environment_spec: EnvironmentSpec | None = None
         self._last_world_model: WorldModel | None = None
+        self._last_value_model: ValueModel | None = None
         self._online_planner = OnlinePlanner(neural_engine=self._neural)
 
     # -- properties ----------------------------------------------------------
@@ -283,6 +285,7 @@ class Orchestrator:
                 environment_spec=self._last_environment_spec,
                 world_model=self._last_world_model,
                 max_tokens=max_tokens,
+                value_model=self._last_value_model,
             )
             being_response = plan_result.chosen_response
             logger.info(
@@ -497,6 +500,8 @@ class Orchestrator:
                         self._last_environment_spec = result.environment_spec
                     if result.world_model is not None:
                         self._last_world_model = result.world_model
+                    if result.value_model is not None:
+                        self._last_value_model = result.value_model
 
                     # Store extracted facts and persist inside the lock
                     for fact in result.facts_extracted:
@@ -622,6 +627,8 @@ class Orchestrator:
             self._last_environment_spec = result.environment_spec
         if result.world_model is not None:
             self._last_world_model = result.world_model
+        if result.value_model is not None:
+            self._last_value_model = result.value_model
 
         # Store extracted facts in relational memory
         for fact in result.facts_extracted:
