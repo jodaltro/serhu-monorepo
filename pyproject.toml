@@ -5,7 +5,12 @@ description = "SerHu - Synthetic Being Ontogenesis Monorepo"
 requires-python = ">=3.11"
 
 [tool.pytest.ini_options]
-testpaths = ["packages/orchestrator/tests"]
+testpaths = [
+    "packages/orchestrator/tests",
+    "packages/morphogenesis/tests",
+    "packages/api/tests",
+    "packages/grpc_server/tests",
+]
 markers = [
     "integration: marks tests that require external services (Qdrant, Supabase)",
     "unit: marks unit tests",

@@ -435,6 +435,57 @@ def _stage_llm_params(stage: str, cognitive_age: float) -> tuple[int, float]:
     return 1024, 0.7
 ```
 
+## **Módulos da Aplicação (Implementados)**
+
+### **API REST (`packages/api/`)**
+
+Servidor FastAPI que expõe o Orchestrator via REST para clientes mobile/web:
+
+| Arquivo | Responsabilidade |
+| :---- | :---- |
+| `app.py` | FastAPI app factory com lifespan |
+| `config.py` | Configurações via pydantic-settings (.env) |
+| `schemas.py` | Schemas Pydantic para request/response |
+| `dependencies.py` | Injeção de dependência para Orchestrator |
+| `routes/health.py` | Health check |
+| `routes/beings.py` | CRUD, chat, process, consolidate, sleep, recall, learn, visual |
+
+**Endpoints:** POST `/beings`, GET `/beings/{id}`, GET `/beings/{id}/personality`, POST `/beings/{id}/chat`, POST `/beings/{id}/process`, POST `/beings/{id}/consolidate`, POST `/beings/{id}/sleep`, POST `/beings/{id}/recall`, POST `/beings/{id}/learn`, GET `/beings/{id}/visual`
+
+### **Morfogênese Visual (`packages/morphogenesis/`)**
+
+Motor de transformação personalidade → representação visual 3D:
+
+| Arquivo | Responsabilidade |
+| :---- | :---- |
+| `types.py` | VisualState, ColorProfile, GeometryProfile, AnimationParams |
+| `color.py` | Personalidade → cor HSL (hue=dimensão dominante, saturation=arousal, lightness=valência) |
+| `geometry.py` | Personalidade → forma (roundness, spikiness, symmetry, complexity, scale) |
+| `animation.py` | Temperamento → movimento (pulse, speed, center_attraction, glow, roughness) |
+| `engine.py` | Pipeline principal: `compute_visual_state(PersonalityState) → VisualState` |
+
+**Princípio Kiki/Bouba:** Agreeable → Bouba (redondo, suave); Assertive → Kiki (angular, pontiagudo)
+
+### **gRPC Server (`packages/grpc_server/`)**
+
+Implementação do BeingService (proto/ser_identity.proto) para comunicação Lambda ↔ Fargate:
+
+| Arquivo | Responsabilidade |
+| :---- | :---- |
+| `service.py` | SerhuBeingServicer: GetLedger, RecordEvent, ReplayEvents, StreamEvents |
+| `server.py` | gRPC server setup com CLI (`python -m serhu_grpc.server --port 50051`) |
+
+**Event Sourcing:** Cada mutação é um PersonalityEvent imutável. Estado reconstruído via replay.
+
+### **Testes (328 total)**
+
+```bash
+# Todos os testes (sem serviços externos)
+python -m pytest packages/orchestrator/tests/unit packages/orchestrator/tests/e2e \
+  packages/morphogenesis/tests/unit packages/api/tests/unit \
+  packages/grpc_server/tests/unit -v
+```
+
 ## **Conclusões e Recomendações para o Futuro do Ser**
 
 O desafio de criar um ser artificial tabula rasa com alta granularidade transcende a engenharia de software convencional. Ele exige a construção de um espelho psicológico dinâmico, onde a IA não apenas "conversa", mas "se torna".
