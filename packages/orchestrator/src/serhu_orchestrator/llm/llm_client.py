@@ -194,3 +194,37 @@ class LLMClient(Protocol):
             List of ``{"action": str, "reward": float, "complexity": float}``.
         """
         ...
+
+    def extract_environment_spec(
+        self,
+        episodes: list[dict],
+        personality_summary: str,
+    ) -> dict:
+        """Extract AIXI environment inputs at the start of sleep.
+
+        Called **once** at the beginning of the sleep cycle to produce
+        the environment specification that the AIXI rollouts will use.
+        This is the only LLM call during sleep.
+
+        The returned dict should contain:
+        - ``actions``: list of action strings the Being can take.
+        - ``observations``: list of observation strings.
+        - ``reward_signals``: dict mapping patterns to reward values.
+        - ``transition_weights``: dict mapping actions to
+          ``[(observation, probability)]`` lists.
+        - ``horizon``: int, maximum look-ahead steps.
+        - ``gamma``: float, discount factor.
+
+        Parameters
+        ----------
+        episodes : list[dict]
+            Recent episodic memory entries.
+        personality_summary : str
+            Summary of the Being's current personality state.
+
+        Returns
+        -------
+        dict
+            Raw environment specification for ``EnvironmentBuilder._parse_llm_spec()``.
+        """
+        ...

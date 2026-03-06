@@ -80,13 +80,16 @@ The prompt builder generates **different prompt structures per stage** via
 ### Sleep Cycle (Offline Processing — Self-Learning)
 
 The sleep cycle is the Being's primary mechanism for building its own
-internal language model.  No external LLM is required.
+internal language model.  The LLM (if available) is used **only once
+at the start** of sleep to extract the AIXI environment inputs.  All
+subsequent rollouts run autonomously.
 
 | Phase | Mechanism | Function |
 |---|---|---|
+| **Environment Build** | LLM one-shot extraction (fallback: NeuralEngine patterns) | Build AIXI environment (actions, observations, rewards, transitions, horizon, gamma) |
 | **Training** | NeuralEngine (TF-IDF + self-attention + n-gram mining) | Build internal model from episodic memories (transformer-inspired) |
 | **Semantization** | NeuralEngine pattern analysis (fallback: keyword frequency) | Transform episodic memory → semantic memory (patterns, beliefs, facts) |
-| **Dream (REM)** | NeuralEngine hypothesis generation + MC-AIXI rollouts | Generate hypotheses via self-learned pattern discovery |
+| **Dream (REM)** | MC-AIXI rollouts against `AixiEnvironment` (reset/step interface) | Generate hypotheses via environment simulation with discounted rewards |
 | **Consolidation (NREM)** | SVD rank-reduction | Noise removal from personality vector |
 | **Ledger Update** | NeuralEngine belief derivation + belief stack + persist | Derive beliefs from dreams, store evolved traits |
 
@@ -112,8 +115,8 @@ generated in the Being's language via `i18n.py`.
 |--------|------|-------------|
 | **orchestrator** | `orchestrator.py` | The Brain — top-level lifecycle controller |
 | **neural_engine** | `sleep/neural_engine.py` | Transformer-inspired self-learning engine (TF-IDF, self-attention, n-gram patterns, response generation) |
-| **llm_client** | `llm/llm_client.py` | LLM protocol interface (deprecated — kept for backward compatibility) |
-| **openai_client** | `llm/openai_client.py` | OpenAI implementation (deprecated — no longer used by Orchestrator) |
+| **llm_client** | `llm/llm_client.py` | LLM protocol interface (used for one-shot AIXI environment extraction at sleep start) |
+| **openai_client** | `llm/openai_client.py` | OpenAI implementation (extract_environment_spec for AIXI) |
 | **working_memory** | `memory/working_memory.py` | In-process FIFO buffer (RAM) |
 | **archival_memory** | `memory/archival_memory.py` | Qdrant vector store (Disk) |
 | **relational_memory** | `memory/relational_memory.py` | Supabase structured store (DB) |
@@ -124,8 +127,9 @@ generated in the Being's language via `i18n.py`.
 | **i18n** | `personality/i18n.py` | Translations (EN, PT, ES, FR) |
 | **event_store** | `personality/event_store.py` | Event Sourcing (append-only life log + replay) |
 | **proto_converter** | `personality/proto_converter.py` | Pydantic ↔ Protobuf bidirectional conversion |
-| **dream_engine** | `sleep/dream_engine.py` | AIXI rollouts (NeuralEngine-powered hypothesis generation + random fallback) + SVD dream pruning |
-| **sleep_cycle** | `sleep/sleep_cycle.py` | Full sleep orchestration (NREM + REM) |
+| **dream_engine** | `sleep/dream_engine.py` | AIXI rollouts against `AixiEnvironment` (reset/step) + SVD dream pruning |
+| **sleep_cycle** | `sleep/sleep_cycle.py` | Full sleep orchestration (environment build → training → semantize → REM → NREM → ledger) |
+| **aixi_environment** | `sleep/aixi_environment.py` | RL-like AIXI environment (EnvironmentSpec, AixiEnvironment, EnvironmentBuilder) |
 
 ## Setup
 
@@ -151,8 +155,10 @@ Required variables:
 - `SUPABASE_URL` — Supabase project URL
 - `SUPABASE_KEY` — Supabase anon/service key
 
-**Note:** External LLM (GPT-5.4) is no longer required. The Being learns
-from its own experiences via the NeuralEngine during sleep cycles.
+**Note:** External LLM (GPT-5.4) is optional. When provided via `llm_client`,
+it is used **only once at sleep start** to extract the AIXI environment
+specification.  Without it, the NeuralEngine builds the environment from
+its own learned patterns.
 
 ### Supabase Table Setup
 

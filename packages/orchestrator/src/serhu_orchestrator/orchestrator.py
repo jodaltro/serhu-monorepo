@@ -7,18 +7,19 @@ Lifecycle phases:
     1. **Wakefulness** – Active interaction via ``process_message()`` or ``chat()``.
     2. **Twilight**    – Consolidation via ``consolidate()``.
     3. **Sleep**       – Continuous AIXI dreaming via ``sleep()``.
-       The sleep runs indefinitely (as AIXI should be) until
-       ``wake()`` is called or the user interacts again.
+       At the start of sleep, the LLM (if available) is called *once*
+       to extract the AIXI environment inputs (actions, observations,
+       rewards, transitions) from the Being's episodes and personality.
+       All subsequent AIXI rollouts run autonomously without LLM calls.
        During sleep, the NeuralEngine builds the Being's internal
        language model using transformer-inspired self-attention
        and pattern mining over episodic memories.
     4. **Wake**        – ``wake()`` stops the sleep loop and returns
        accumulated dream results.
 
-The Being learns from its own experiences—no external LLM dependency.
-The ``chat()`` method generates responses using the Being's learned
-patterns, vocabulary, and personality.  The quality of responses improves
-as the Being accumulates more experience and sleep cycles.
+The Being learns from its own experiences—the LLM is only used for
+environment extraction at sleep start.  The ``chat()`` method generates
+responses using the Being's learned patterns, vocabulary, and personality.
 
 References:
     - MemGPT: https://informationmatters.org/2025/10/memgpt-engineering-semantic-memory/
@@ -75,8 +76,9 @@ class Orchestrator:
     embed_fn : callable | None
         Embedding function ``(text) -> list[float]``.
     llm_client : object | None
-        **Deprecated.** Ignored for backward compatibility.
-        The Being now learns from its own experiences via the NeuralEngine.
+        LLM client for one-shot environment extraction at sleep start.
+        Only used to build the AIXI environment (``extract_environment_spec``).
+        All subsequent rollouts run autonomously without LLM calls.
     """
 
     def __init__(
@@ -96,6 +98,7 @@ class Orchestrator:
     ) -> None:
         # -- NeuralEngine (self-learning) ------------------------------------
         self._neural = NeuralEngine()
+        self._llm_client = llm_client
 
         # -- memory tiers ----------------------------------------------------
         self._working = WorkingMemory(max_entries=working_memory_size)
@@ -419,7 +422,7 @@ class Orchestrator:
         logger.info(f"  → Retrieved {len(episodes)} episodes for dreaming")
 
         # Create the sleep cycle (NeuralEngine shared from orchestrator)
-        dream_engine = DreamEngine(seed=seed, neural_engine=self._neural)
+        dream_engine = DreamEngine(seed=seed, neural_engine=self._neural, llm_client=self._llm_client)
         cycle = SleepCycle(dream_engine=dream_engine)
         self._sleep_cycle = cycle
         self._sleep_result = None
@@ -547,7 +550,7 @@ class Orchestrator:
         logger.info(f"  → Retrieved {len(episodes)} episodes for dreaming")
 
         # Run the sleep cycle (NeuralEngine shared from orchestrator)
-        dream_engine = DreamEngine(seed=seed, neural_engine=self._neural)
+        dream_engine = DreamEngine(seed=seed, neural_engine=self._neural, llm_client=self._llm_client)
         cycle = SleepCycle(dream_engine=dream_engine)
         self._personality, result = cycle.run(
             self._personality,
