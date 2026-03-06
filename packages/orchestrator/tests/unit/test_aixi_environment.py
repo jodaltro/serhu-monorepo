@@ -233,9 +233,11 @@ class TestAixiEnvironment:
         )
         env = AixiEnvironment(spec, [0.5] * 72, seed=42, world_model=wm)
         env.reset()
-        _, reward, _, _ = env.step("explore_topic")
+        _, reward, _, info = env.step("explore_topic")
         # Should include rewards from both "explore" (in action) and "user_happy" (in obs)
         assert reward > 0.0
+        # Extrinsic component must match reward_signals
+        assert info["r_ext"] == pytest.approx(0.8)  # 0.5 + 0.3
 
     def test_personality_modulates_reward(self):
         spec = EnvironmentSpec(
@@ -260,13 +262,145 @@ class TestAixiEnvironment:
 
         env_high = AixiEnvironment(spec, high_vec, seed=42, world_model=wm)
         env_high.reset()
-        _, r_high, _, _ = env_high.step("explore_novel")
+        _, r_high, _, info_high = env_high.step("explore_novel")
 
         env_low = AixiEnvironment(spec, low_vec, seed=42, world_model=wm)
         env_low.reset()
-        _, r_low, _, _ = env_low.step("explore_novel")
+        _, r_low, _, info_low = env_low.step("explore_novel")
 
         assert r_high > r_low
+
+        # Both should have the same extrinsic (0) and intrinsic (0.3) reward
+        assert info_high["r_ext"] == info_low["r_ext"] == 0.0
+        assert info_high["r_int"] == info_low["r_int"] == pytest.approx(0.3)
+
+        # Personality only affects alpha → r_total
+        assert info_high["r_total"] > info_low["r_total"]
+
+    def test_step_returns_decomposed_rewards_in_info(self):
+        spec = EnvironmentSpec(
+            actions=["ask_question"],
+            observations=["user_curious"],
+            reward_signals={"ask": 0.2, "user_curious": 0.25},
+            horizon=5,
+        )
+        wm = WorldModel(
+            transition_weights={"ask_question": [("user_curious", 1.0)]},
+        )
+        env = AixiEnvironment(spec, [0.5] * 72, seed=42, world_model=wm)
+        env.reset()
+        _, reward, _, info = env.step("ask_question")
+
+        assert "r_ext" in info
+        assert "r_int" in info
+        assert "r_total" in info
+        assert isinstance(info["r_ext"], float)
+        assert isinstance(info["r_int"], float)
+        assert isinstance(info["r_total"], float)
+        assert reward == info["r_total"]
+
+    def test_extrinsic_reward_is_personality_independent(self):
+        spec = EnvironmentSpec(
+            actions=["respond_empathically"],
+            observations=["user_happy"],
+            reward_signals={"respond_empathically": 0.3, "user_happy": 0.4},
+            horizon=5,
+        )
+        wm = WorldModel(
+            transition_weights={"respond_empathically": [("user_happy", 1.0)]},
+        )
+
+        vec_a = [0.0] * 72
+        vec_b = [1.0] * 72
+
+        env_a = AixiEnvironment(spec, vec_a, seed=42, world_model=wm)
+        env_a.reset()
+        _, _, _, info_a = env_a.step("respond_empathically")
+
+        env_b = AixiEnvironment(spec, vec_b, seed=42, world_model=wm)
+        env_b.reset()
+        _, _, _, info_b = env_b.step("respond_empathically")
+
+        # r_ext must be identical regardless of personality
+        assert info_a["r_ext"] == info_b["r_ext"]
+
+    def test_intrinsic_reward_is_personality_independent(self):
+        spec = EnvironmentSpec(
+            actions=["explore_novel"],
+            observations=["user_curious"],
+            reward_signals={},
+            horizon=5,
+        )
+        wm = WorldModel(
+            transition_weights={"explore_novel": [("user_curious", 1.0)]},
+        )
+
+        vec_a = [0.0] * 72
+        vec_b = [1.0] * 72
+
+        env_a = AixiEnvironment(spec, vec_a, seed=42, world_model=wm)
+        env_a.reset()
+        _, _, _, info_a = env_a.step("explore_novel")
+
+        env_b = AixiEnvironment(spec, vec_b, seed=42, world_model=wm)
+        env_b.reset()
+        _, _, _, info_b = env_b.step("explore_novel")
+
+        # r_int must be identical regardless of personality
+        assert info_a["r_int"] == info_b["r_int"] == pytest.approx(0.3)
+
+    def test_alpha_scales_intrinsic_reward(self):
+        spec = EnvironmentSpec(
+            actions=["explore_novel"],
+            observations=["user_curious"],
+            reward_signals={},
+            horizon=5,
+        )
+        wm = WorldModel(
+            transition_weights={"explore_novel": [("user_curious", 1.0)]},
+        )
+
+        # alpha = (openness + curiosity) / 2
+        high_vec = [0.5] * 72
+        high_vec[20] = 1.0  # openness
+        high_vec[24] = 1.0  # curiosity
+        # alpha = 1.0, r_total = 0.0 + 1.0 * 0.3 = 0.3
+
+        low_vec = [0.5] * 72
+        low_vec[20] = 0.0
+        low_vec[24] = 0.0
+        # alpha = 0.0, r_total = 0.0 + 0.0 * 0.3 = 0.0
+
+        env_high = AixiEnvironment(spec, high_vec, seed=42, world_model=wm)
+        env_high.reset()
+        _, _, _, info_high = env_high.step("explore_novel")
+
+        env_low = AixiEnvironment(spec, low_vec, seed=42, world_model=wm)
+        env_low.reset()
+        _, _, _, info_low = env_low.step("explore_novel")
+
+        assert info_high["r_total"] == pytest.approx(0.3)
+        assert info_low["r_total"] == pytest.approx(0.0)
+
+    def test_no_intrinsic_reward_for_non_explore_actions(self):
+        spec = EnvironmentSpec(
+            actions=["reflect_on_self"],
+            observations=["user_reflective"],
+            reward_signals={"reflect": 0.2},
+            horizon=5,
+        )
+        wm = WorldModel(
+            transition_weights={"reflect_on_self": [("user_reflective", 1.0)]},
+        )
+        vec = [1.0] * 72  # max personality
+        env = AixiEnvironment(spec, vec, seed=42, world_model=wm)
+        env.reset()
+        _, _, _, info = env.step("reflect_on_self")
+
+        # No explore keywords → r_int = 0
+        assert info["r_int"] == 0.0
+        # r_total = r_ext + alpha * 0 = r_ext
+        assert info["r_total"] == info["r_ext"]
 
     def test_reset_resets_step_count(self):
         env = AixiEnvironment(
@@ -390,7 +524,7 @@ class TestEnvironmentBuilderFromNeuralEngine:
         assert "user_curious" in spec.observations
         assert "silence" in spec.observations
 
-    def test_rewards_personality_modulated(self):
+    def test_rewards_are_personality_independent(self):
         episodes = [{"content": "Hello world"}]
         neural = NeuralEngine(seed=42)
 
@@ -404,8 +538,8 @@ class TestEnvironmentBuilderFromNeuralEngine:
         spec_high, _ = EnvironmentBuilder.from_neural_engine(neural, episodes, high_open)
         spec_low, _ = EnvironmentBuilder.from_neural_engine(neural, episodes, low_open)
 
-        # "explore" reward should be higher for open personality
-        assert spec_high.reward_signals.get("explore", 0) > spec_low.reward_signals.get("explore", 0)
+        # Reward signals must be identical regardless of personality
+        assert spec_high.reward_signals == spec_low.reward_signals
 
     def test_horizon_scales_with_episodes(self):
         few_eps = [{"content": "Hello"}]
