@@ -475,38 +475,38 @@ class TestEriksonConflictTransition:
 
 
 # ---------------------------------------------------------------------------
-# Stage-aware LLM parameters (Orchestrator._stage_llm_params)
+# Stage-aware LLM parameters (Orchestrator.stage_llm_params)
 # ---------------------------------------------------------------------------
 
-from serhu_orchestrator.orchestrator import _stage_llm_params
+from serhu_orchestrator.orchestrator import stage_llm_params
 
 
 class TestStageLLMParams:
     """Tests for stage-aware LLM token/temperature settings."""
 
     def test_early_sensorimotor_very_low_tokens(self):
-        max_tokens, temp = _stage_llm_params("sensorimotor", 2.0)
+        max_tokens, temp = stage_llm_params("sensorimotor", 2.0)
         assert max_tokens <= 20
         assert temp > 0.5
 
     def test_mid_sensorimotor_low_tokens(self):
-        max_tokens, temp = _stage_llm_params("sensorimotor", 8.0)
+        max_tokens, temp = stage_llm_params("sensorimotor", 8.0)
         assert max_tokens <= 30
 
     def test_late_sensorimotor_moderate_tokens(self):
-        max_tokens, temp = _stage_llm_params("sensorimotor", 18.0)
+        max_tokens, temp = stage_llm_params("sensorimotor", 18.0)
         assert max_tokens <= 50
 
     def test_preoperational_limited_tokens(self):
-        max_tokens, temp = _stage_llm_params("preoperational", 30.0)
+        max_tokens, temp = stage_llm_params("preoperational", 30.0)
         assert max_tokens <= 200
         assert max_tokens > 50
 
     def test_concrete_operational_medium_tokens(self):
-        max_tokens, temp = _stage_llm_params("concrete_operational", 90.0)
+        max_tokens, temp = stage_llm_params("concrete_operational", 90.0)
         assert max_tokens >= 256
         assert max_tokens <= 1024
 
     def test_formal_operational_full_tokens(self):
-        max_tokens, temp = _stage_llm_params("formal_operational", 140.0)
+        max_tokens, temp = stage_llm_params("formal_operational", 140.0)
         assert max_tokens >= 1024

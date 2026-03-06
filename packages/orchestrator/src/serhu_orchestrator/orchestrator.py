@@ -229,7 +229,7 @@ class Orchestrator:
         # 4. Stage-aware LLM parameters – prevent verbose output in early stages
         stage = self._personality.development.stage
         age = self._personality.development.cognitive_age
-        max_tokens, temperature = _stage_llm_params(stage, age)
+        max_tokens, temperature = stage_llm_params(stage, age)
 
         # 5. Generate Being's response via LLM
         llm_response = self._llm.chat(
@@ -387,7 +387,7 @@ class Orchestrator:
         self._archival.delete_collection()
 
 
-def _stage_llm_params(stage: str, cognitive_age: float) -> tuple[int, float]:
+def stage_llm_params(stage: str, cognitive_age: float) -> tuple[int, float]:
     """Return (max_tokens, temperature) tuned for the developmental stage.
 
     Early stages use very low token limits to physically prevent the LLM
