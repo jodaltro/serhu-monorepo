@@ -187,6 +187,39 @@ body {
   font-weight: 600;
 }
 
+/* ── Setup tabs ──────────────────────────────────────────── */
+#setup-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 24px;
+  background: rgba(255,255,255,0.04);
+  border-radius: 10px;
+  padding: 4px;
+}
+
+#setup-tabs .tab {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 0;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+#setup-tabs .tab.active {
+  background: var(--accent);
+  color: white;
+}
+
+.tab-panel.hidden {
+  display: none;
+}
+
 #setup-form {
   display: flex;
   flex-direction: column;
@@ -232,6 +265,85 @@ body {
 
 #setup-form button:hover {
   background: #6a5acd;
+}
+
+/* ── Sleep button ───────────────────────────────────────────── */
+#copy-id-btn {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 10px;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+  line-height: 1;
+}
+
+#copy-id-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255,255,255,0.2);
+  color: var(--text);
+}
+
+#sleep-btn {
+  margin-left: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 10px;
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+  line-height: 1;
+}
+
+#sleep-btn:hover {
+  background: rgba(123, 104, 238, 0.15);
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+#sleep-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+#sleep-btn.sleeping {
+  animation: pulse-sleep 1.2s ease-in-out infinite;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+@keyframes pulse-sleep {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* ── Sleep toast ─────────────────────────────────────────────── */
+#sleep-toast {
+  position: fixed;
+  bottom: 90px;
+  right: 24px;
+  background: var(--panel-bg);
+  border: 1px solid rgba(123, 104, 238, 0.4);
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-size: 12px;
+  color: var(--accent);
+  backdrop-filter: blur(20px);
+  z-index: 20;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.3s, transform 0.3s;
+  pointer-events: none;
+}
+
+#sleep-toast.show {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 /* ── Scrollbar ──────────────────────────────────────────────── */

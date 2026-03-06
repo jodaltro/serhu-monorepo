@@ -117,3 +117,28 @@ export function processMessage(beingId, role, content) {
 export function getVisualState(beingId) {
   return request(`/beings/${beingId}/visual`);
 }
+
+/**
+ * Consolidate working memory to long-term storage (twilight phase).
+ * @param {string} beingId
+ * @returns {Promise<Object>}
+ */
+export function consolidate(beingId) {
+  return request(`/beings/${beingId}/consolidate`, { method: "POST" });
+}
+
+/**
+ * Trigger a full sleep cycle (NREM + REM).
+ * @param {string} beingId
+ * @param {object} [opts]
+ * @param {number} [opts.num_rollouts=1000]
+ * @param {number} [opts.svd_rank=8]
+ * @param {number|null} [opts.seed=null]
+ * @returns {Promise<{ facts_extracted: number, beliefs_added: number, hypotheses_generated: number }>}
+ */
+export function sleep(beingId, { num_rollouts = 1000, svd_rank = 8, seed = null } = {}) {
+  return request(`/beings/${beingId}/sleep`, {
+    method: "POST",
+    body: JSON.stringify({ num_rollouts, svd_rank, seed }),
+  });
+}

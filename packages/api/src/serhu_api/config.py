@@ -6,8 +6,15 @@ All external service credentials are centralised here.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from pydantic import Field
 from pydantic_settings import BaseSettings
+
+# Resolve the monorepo root regardless of where uvicorn is launched from.
+# config.py lives at packages/api/src/serhu_api/config.py → 4 levels up = root.
+_MONOREPO_ROOT = Path(__file__).resolve().parents[4]
+_ENV_FILE = str(_MONOREPO_ROOT / ".env")
 
 
 class Settings(BaseSettings):
@@ -55,7 +62,7 @@ class Settings(BaseSettings):
     )
 
     model_config = {
-        "env_file": ".env",
+        "env_file": _ENV_FILE,
         "env_file_encoding": "utf-8",
         "case_sensitive": False,
     }

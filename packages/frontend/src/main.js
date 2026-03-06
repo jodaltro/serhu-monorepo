@@ -22,9 +22,19 @@ let beingName = "";
 let being = null; // { update, animate, mesh }
 let sceneCtx = null; // { scene, camera, renderer }
 
-// -- Setup flow ------------------------------------------------------------
+// -- Setup flow (create) ---------------------------------------------------
 const setupOverlay = document.getElementById("setup-overlay");
 const setupForm = document.getElementById("setup-form");
+
+// Tab switching
+document.getElementById("setup-tabs").addEventListener("click", (e) => {
+  const tab = e.target.closest(".tab");
+  if (!tab) return;
+  document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
+  document.querySelectorAll(".tab-panel").forEach((p) => p.classList.add("hidden"));
+  tab.classList.add("active");
+  document.getElementById(`tab-${tab.dataset.tab}`).classList.remove("hidden");
+});
 
 setupForm.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -34,7 +44,6 @@ setupForm.addEventListener("submit", async (e) => {
   const language = langSelect.value;
   if (!name) return;
 
-  // Disable form while creating
   const btn = setupForm.querySelector("button");
   btn.disabled = true;
   btn.textContent = "Creating…";
@@ -44,13 +53,40 @@ setupForm.addEventListener("submit", async (e) => {
     beingId = info.being_id;
     beingName = info.name;
 
-    // Hide setup, start scene
     setupOverlay.classList.add("hidden");
     startScene(info);
   } catch (err) {
     alert(`Failed to create Being: ${err.message}`);
     btn.disabled = false;
     btn.textContent = "Give birth ✦";
+  }
+});
+
+// -- Setup flow (load existing) --------------------------------------------
+
+const loadForm = document.getElementById("load-form");
+
+loadForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const idInput = document.getElementById("being-id-input");
+  const id = idInput.value.trim();
+  if (!id) return;
+
+  const btn = loadForm.querySelector("button");
+  btn.disabled = true;
+  btn.textContent = "Connecting…";
+
+  try {
+    const info = await api.getBeing(id);
+    beingId = info.being_id;
+    beingName = info.name;
+
+    setupOverlay.classList.add("hidden");
+    startScene(info);
+  } catch (err) {
+    alert(`Being not found: ${err.message}`);
+    btn.disabled = false;
+    btn.textContent = "Connect ↗";
   }
 });
 
@@ -88,6 +124,20 @@ async function startScene(info) {
     onAfterSend: refreshVisualState,
   });
 
+  // Initialise sleep button
+  initSleepButton();
+
+  // Copy-ID button
+  const copyBtn = document.getElementById("copy-id-btn");
+  if (copyBtn) {
+    copyBtn.addEventListener("click", () => {
+      navigator.clipboard.writeText(beingId).then(() => {
+        copyBtn.textContent = "✓";
+        setTimeout(() => { copyBtn.textContent = "⎘"; }, 1500);
+      });
+    });
+  }
+
   // Start render loop
   const clock = { start: performance.now() / 1000 };
   function loop() {
@@ -110,4 +160,50 @@ async function refreshVisualState() {
   } catch {
     // Silently ignore — Being keeps last known state
   }
+}
+
+// -- Sleep button ----------------------------------------------------------
+
+function initSleepButton() {
+  const btn = document.getElementById("sleep-btn");
+  if (!btn) return;
+
+  // Create toast element
+  const toast = document.createElement("div");
+  toast.id = "sleep-toast";
+  document.body.appendChild(toast);
+
+  function showToast(msg) {
+    toast.textContent = msg;
+    toast.classList.add("show");
+    setTimeout(() => toast.classList.remove("show"), 3500);
+  }
+
+  btn.addEventListener("click", async () => {
+    if (!beingId) return;
+    btn.disabled = true;
+    btn.classList.add("sleeping");
+    btn.title = "Sleeping…";
+
+    try {
+      // Twilight: consolidate working memory first
+      await api.consolidate(beingId);
+
+      // Sleep: NREM + REM cycle
+      const result = await api.sleep(beingId, { num_rollouts: 500, svd_rank: 8 });
+
+      showToast(
+        `💤 Sleep done · ${result.facts_extracted} facts · ${result.beliefs_added} beliefs · ${result.hypotheses_generated} dreams`
+      );
+
+      // Refresh visual state — personality evolved during sleep
+      await refreshVisualState();
+    } catch (err) {
+      showToast(`⚠ Sleep failed: ${err.message}`);
+    } finally {
+      btn.disabled = false;
+      btn.classList.remove("sleeping");
+      btn.title = "Trigger sleep cycle (consolidate + dream)";
+    }
+  });
 }
