@@ -36,3 +36,8 @@ Thumbs.db
 # Distribution
 *.whl
 *.tar.gz
+
+# Node.js
+node_modules/
+package-lock.json
+dist/

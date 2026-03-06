@@ -477,13 +477,56 @@ Implementação do BeingService (proto/ser_identity.proto) para comunicação La
 
 **Event Sourcing:** Cada mutação é um PersonalityEvent imutável. Estado reconstruído via replay.
 
-### **Testes (328 total)**
+### **Frontend Three.js (`packages/frontend/`)**
+
+Interface web que renderiza o Ser em 3D no cosmos usando Three.js. O usuário interage via texto; o Ser responde fisicamente (forma, cor, animação evoluem com a personalidade).
+
+| Arquivo | Responsabilidade |
+| :---- | :---- |
+| `src/main.js` | Entry point: conecta scene, Being, chat e API |
+| `src/scene.js` | Three.js scene, câmera, iluminação, starfield cosmos |
+| `src/being.js` | Mesh 3D do Ser com morfogênese (geometria Kiki/Bouba, cor HSL, PBR, animação) |
+| `src/chat.js` | UI de chat por texto (input do usuário, respostas do Ser) |
+| `src/api.js` | Cliente REST (createBeing, chat, getVisualState, processMessage) |
+| `src/style.css` | Estilo visual (painel de chat, setup overlay, cosmos theme) |
+| `index.html` | HTML principal com setup overlay e chat panel |
+| `vite.config.js` | Configuração Vite com proxy para API (porta 3000 → 8000) |
+
+**Fluxo de Renderização:**
+1. Usuário cria Ser via setup form → `POST /beings/`
+2. Three.js scene inicializa com starfield cósmico
+3. Ser aparece como ponto branco brilhante (tabula rasa sensorimotor)
+4. Cada interação textual → `POST /beings/{id}/chat` → `GET /beings/{id}/visual`
+5. VisualState atualiza mesh 3D em tempo real (cor, forma, movimento, glow)
+
+**Morfogênese 3D (being.js):**
+- `IcosahedronGeometry` (detail=4, ~2560 faces) como base
+- Deformação de vértices por `spikiness` (Kiki) e `roundness` (Bouba)
+- `organic_noise` adiciona ondulação orgânica multi-oitava
+- `MeshPhysicalMaterial` com emissive glow, clearcoat, roughness/metalness
+- Pulso respiratório baseado em `pulse_rate` (Hz)
+- Movimento Lissajous controlado por `movement_speed` e `center_attraction`
+- Escala cresce com desenvolvimento cognitivo (`scale`)
+
+**Execução:**
+```bash
+cd packages/frontend
+npm install
+npm run dev      # Inicia Vite dev server na porta 3000
+npm run build    # Build de produção em dist/
+npm run test     # Testes unitários (vitest)
+```
+
+### **Testes (319 Python + 7 JS)**
 
 ```bash
-# Todos os testes (sem serviços externos)
+# Todos os testes Python (sem serviços externos)
 python -m pytest packages/orchestrator/tests/unit packages/orchestrator/tests/e2e \
   packages/morphogenesis/tests/unit packages/api/tests/unit \
   packages/grpc_server/tests/unit -v
+
+# Testes frontend (Three.js/API client)
+cd packages/frontend && npm test
 ```
 
 ## **Conclusões e Recomendações para o Futuro do Ser**
