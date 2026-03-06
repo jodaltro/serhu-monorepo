@@ -200,7 +200,8 @@ class OnlinePlanner:
             )
 
         # Step 4: Pick the best candidate
-        best_idx = max(range(len(candidate_rewards)), key=lambda i: candidate_rewards[i])
+        best_reward = max(candidate_rewards)
+        best_idx = candidate_rewards.index(best_reward)
         result = PlanResult(
             chosen_response=candidates[best_idx],
             chosen_action=candidate_actions[best_idx],
@@ -273,19 +274,17 @@ class OnlinePlanner:
         seen: set[str] = set()
 
         for i in range(self._num_candidates):
-            # Vary the seed for diversity
             variant_seed = (self._seed or 0) + i + 1
             response = self._neural.generate_response(
                 context, personality_vector, max_tokens=max_tokens
             )
 
-            # Add small perturbation by shuffling last tokens
+            # Add small perturbation by swapping tokens for diversity
             if response and i > 0:
                 tokens = response.split()
-                if len(tokens) > 2:
+                if len(tokens) >= 3:
                     rng = random.Random(variant_seed)
-                    # Swap two random tokens for diversity
-                    a, b = rng.sample(range(len(tokens)), min(2, len(tokens)))
+                    a, b = rng.sample(range(len(tokens)), 2)
                     tokens[a], tokens[b] = tokens[b], tokens[a]
                     response = " ".join(tokens)
 
@@ -448,11 +447,12 @@ class OnlinePlanner:
         response_tokens = being_response.lower().split()
         engagement = min(len(response_tokens) / 10.0, 1.0)
 
-        # Relevance: token overlap with user message
+        # Relevance: Jaccard-like overlap with user message
         user_tokens = set(user_message.lower().split())
         response_token_set = set(response_tokens)
+        union_size = len(user_tokens | response_token_set)
         overlap = len(user_tokens & response_token_set)
-        relevance = overlap / max(len(user_tokens), 1)
+        relevance = overlap / max(union_size, 1)
 
         # Environment reward signals (if available)
         signal_reward = 0.0

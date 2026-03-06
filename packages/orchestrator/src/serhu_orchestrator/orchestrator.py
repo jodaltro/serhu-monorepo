@@ -314,6 +314,7 @@ class Orchestrator:
                 logger.info(f"  → Traits updated: {list(trait_deltas.keys())}")
 
         # 6. Record real experience + reward post-turn
+        # spec may be None before first sleep; reward signals are skipped in that case
         real_reward = OnlinePlanner.compute_real_reward(
             user_message, being_response, personality_vector,
             spec=self._last_environment_spec,

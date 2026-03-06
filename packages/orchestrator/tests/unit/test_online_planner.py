@@ -330,6 +330,7 @@ class TestOnlinePlannerActionMapping:
         planner = OnlinePlanner(engine, seed=42)
         spec = _make_spec()
 
+        # "explore" tokens overlap with "explore_topic" action
         action = planner._map_response_to_action("explore the stars", spec)
         assert action == "explore_topic"
 
@@ -341,8 +342,10 @@ class TestOnlinePlannerActionMapping:
         action = planner._map_response_to_action(
             "I feel empathically towards you", spec
         )
-        # "empathically" overlaps with "respond_empathically"
-        assert "empathically" in action.lower() or action in spec.actions
+        # "empathically" in the response has token overlap with
+        # "respond_empathically" and also gets a reward_boost from
+        # spec.reward_signals["empathically"] = 0.5
+        assert action == "respond_empathically"
 
     def test_empty_actions_fallback(self):
         engine = NeuralEngine(seed=42)
