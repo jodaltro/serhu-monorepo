@@ -6,6 +6,7 @@ multiple API calls to the same Being reuse the same instance.
 
 from __future__ import annotations
 
+import logging
 from functools import lru_cache
 from typing import TYPE_CHECKING
 
@@ -13,6 +14,8 @@ from serhu_api.config import Settings
 
 if TYPE_CHECKING:
     from serhu_orchestrator.orchestrator import Orchestrator
+
+logger = logging.getLogger(__name__)
 
 
 @lru_cache(maxsize=1)
@@ -48,6 +51,7 @@ def create_being_orchestrator(
     """
     from serhu_orchestrator.orchestrator import Orchestrator
 
+    logger.info(f"🆕 Creating new Being: name={name!r}, language={language!r}")
     s = settings or get_settings()
 
     orch = Orchestrator(
@@ -61,6 +65,7 @@ def create_being_orchestrator(
     )
 
     _orchestrators[orch.being_id] = orch
+    logger.info(f"✓ Being created successfully: being_id={orch.being_id}")
     return orch
 
 
@@ -79,8 +84,10 @@ def get_orchestrator(
         If the Being cannot be loaded.
     """
     if being_id in _orchestrators:
+        logger.info(f"♻️  Using cached Orchestrator for being_id={being_id}")
         return _orchestrators[being_id]
 
+    logger.info(f"📂 Loading Being from database: being_id={being_id}")
     from serhu_orchestrator.orchestrator import Orchestrator
 
     s = settings or get_settings()
@@ -95,10 +102,13 @@ def get_orchestrator(
     )
 
     _orchestrators[being_id] = orch
+    logger.info(f"✓ Being loaded successfully: being_id={being_id}")
     return orch
 
 
 def clear_cache() -> None:
     """Clear the Orchestrator cache (for testing)."""
+    logger.info(f"🧹 Clearing orchestrator cache ({len(_orchestrators)} entries)")
     _orchestrators.clear()
     get_settings.cache_clear()
+    logger.info("✓ Cache cleared")

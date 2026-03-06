@@ -12,6 +12,7 @@ References:
 
 from __future__ import annotations
 
+import logging
 import uuid
 
 from serhu_orchestrator.personality.types import (
@@ -27,6 +28,8 @@ from serhu_orchestrator.personality.types import (
     TciTemperament,
 )
 from serhu_orchestrator.memory.relational_memory import RelationalMemory
+
+logger = logging.getLogger(__name__)
 
 
 class PersonalityEngine:
@@ -65,6 +68,7 @@ class PersonalityEngine:
             A fresh personality state ready for interaction.
         """
         being_id = uuid.uuid4().hex
+        logger.info(f"✨ create_being: tabula rasa ~ id={being_id}, name={name!r}, lang={language}")
         state = PersonalityState(
             being_id=being_id,
             name=name,
@@ -77,6 +81,7 @@ class PersonalityEngine:
             core_beliefs=[],
         )
         self._persist(state)
+        logger.info(f"  → Personality persisted to relational memory")
         return state
 
     def load_being(self, being_id: str) -> PersonalityState | None:
@@ -119,6 +124,7 @@ class PersonalityEngine:
         PersonalityState
             Updated personality state (persisted automatically).
         """
+        logger.info(f"📊 update_traits: applying {sum(len(v) for v in deltas.values())} facet deltas")
         model_map = {
             "hexaco": state.hexaco,
             "tci_temperament": state.tci_temperament,
@@ -135,11 +141,13 @@ class PersonalityEngine:
                     current = getattr(model, facet_name)
                     new_val = max(0.0, min(1.0, current + delta))
                     setattr(model, facet_name, new_val)
+                    logger.info(f"  → {model_name}.{facet_name}: {current:.2f} → {new_val:.2f} (delta={delta:+.3f})")
 
         # Advance interaction count (age does NOT advance here)
         state.development.interaction_count += 1
 
         self._persist(state)
+        logger.info(f"  ✓ Personality updated (interactions={state.development.interaction_count})")
         return state
 
     # -- milestone tracking --------------------------------------------------

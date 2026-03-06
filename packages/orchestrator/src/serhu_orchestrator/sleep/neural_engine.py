@@ -209,6 +209,7 @@ class NeuralEngine:
             Metrics about what was learned.
         """
         if not episodes:
+            logger.warning("train: no episodes provided")
             return TrainingResult()
 
         # Phase 1: Tokenize
@@ -444,8 +445,10 @@ class NeuralEngine:
         str
             Generated response text.
         """
+        logger.info(f"🎯 generate_response: max_tokens={max_tokens}")
         if not self._trained or not self._patterns:
             # Untrained: return a basic echo/mirror response
+            logger.info(f"  → Engine untrained, fallback response")
             if context:
                 last = context[-1].split()
                 if last:
@@ -456,6 +459,7 @@ class NeuralEngine:
         context_tokens = set()
         for msg in context[-5:]:
             context_tokens.update(self._tokenize_text(msg))
+        logger.info(f"  → Context tokens: {len(context_tokens)}")
 
         # Score patterns by context relevance + personality alignment
         scored_patterns: list[tuple[LearnedPattern, float]] = []
@@ -465,6 +469,7 @@ class NeuralEngine:
             scored_patterns.append((p, relevance))
 
         scored_patterns.sort(key=lambda x: x[1], reverse=True)
+        logger.info(f"  → Scored {len(scored_patterns)} patterns")
 
         # Compose response from top patterns
         response_tokens: list[str] = []
@@ -491,7 +496,9 @@ class NeuralEngine:
             if scored_patterns:
                 response_tokens = list(scored_patterns[0][0].tokens[:max_tokens])
 
-        return " ".join(response_tokens[:max_tokens]) if response_tokens else "..."
+        result = " ".join(response_tokens[:max_tokens]) if response_tokens else "..."
+        logger.info(f"  ✓ Response: '{result[:40]}...'")
+        return result
 
     # -- Internal: Tokenization ---------------------------------------------
 

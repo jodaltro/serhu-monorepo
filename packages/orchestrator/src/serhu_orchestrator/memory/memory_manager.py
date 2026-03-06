@@ -16,12 +16,15 @@ References:
 from __future__ import annotations
 
 import hashlib
+import logging
 import time
 from dataclasses import dataclass, field
 
 from serhu_orchestrator.memory.working_memory import WorkingMemory, MemoryEntry
 from serhu_orchestrator.memory.archival_memory import ArchivalMemory, ArchivalEntry
 from serhu_orchestrator.memory.relational_memory import RelationalMemory
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -81,11 +84,14 @@ class MemoryManager:
         3. Retrieves relevant archival memories for the new message.
         4. Returns the assembled context window.
         """
+        logger.info(f"💬 add_interaction: {role}='{content[:40]}...'")
         evicted = self.working.add(role, content, metadata)
 
         # Archive evicted entries
-        for entry in evicted:
-            self._archive_entry(entry)
+        if evicted:
+            logger.info(f"  → Archiving {len(evicted)} evicted entries")
+            for entry in evicted:
+                self._archive_entry(entry)
 
         # Log episode to relational store
         self.relational.log_episode(
@@ -98,9 +104,11 @@ class MemoryManager:
         # Retrieve relevant archival context for the new message
         query_vector = self._embed(content)
         archival_results = self.archival.search(query_vector, top_k=3)
+        logger.info(f"  → Retrieved {len(archival_results)} archival results")
 
         # Retrieve semantic facts
         facts = self.relational.get_facts(self.being_id, limit=10)
+        logger.info(f"  → Retrieved {len(facts)} semantic facts")
 
         return ContextWindow(
             working=self.working.get_context(),

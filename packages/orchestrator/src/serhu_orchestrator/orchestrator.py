@@ -197,6 +197,7 @@ class Orchestrator:
                 self._personality, trait_deltas
             )
 
+        logger.info(f"✓ process_message: {role}={content[:50]}... → context={len(context.working)} working, {len(context.archival_results)} archival")
         return context
 
     def chat(
@@ -231,7 +232,9 @@ class Orchestrator:
         tuple[str, ContextWindow]
             The Being's response text and the assembled context window.
         """
+        logger.info(f"🗨️ chat: processing '{user_message[:40]}...'")
         if self.is_sleeping:
+            logger.info(f"  → Being is sleeping, waking up...")
             self.wake()
 
         # 1. Process user message into memory
@@ -241,20 +244,24 @@ class Orchestrator:
         stage = self._personality.development.stage
         age = self._personality.development.cognitive_age
         max_tokens, temperature = stage_llm_params(stage, age)
+        logger.info(f"  → Stage={stage}, age={age:.1f}m, max_tokens={max_tokens}, temp={temperature}")
 
         # 3. Generate Being's response from learned patterns + personality
         recent_context = [entry.content for entry in context.working]
         personality_vector = SleepCycle._flatten_traits(self._personality)
 
+        logger.info(f"  → Generating response (neural engine)...")
         being_response = self._neural.generate_response(
             recent_context, personality_vector, max_tokens=max_tokens
         )
 
         # 4. Store Being's response in memory
         context = self._memory_manager.add_interaction("being", being_response)
+        logger.info(f"  → Response: '{being_response[:50]}...'")
 
         # 5. Optionally extract trait deltas from the interaction
         if auto_traits:
+            logger.info(f"  → Extracting trait deltas...")
             trait_deltas = self._extract_trait_deltas_from_interaction(
                 user_message, being_response
             )
@@ -262,7 +269,9 @@ class Orchestrator:
                 self._personality = self._personality_engine.update_traits(
                     self._personality, trait_deltas
                 )
+                logger.info(f"  → Traits updated: {list(trait_deltas.keys())}")
 
+        logger.info(f"✓ chat complete: response='{being_response[:30]}...'")
         return being_response, context
 
     def _extract_trait_deltas_from_interaction(
@@ -325,7 +334,10 @@ class Orchestrator:
         int
             Number of entries archived.
         """
-        return self._memory_manager.consolidate()
+        logger.info(f"🌅 consolidate: archiving working memory")
+        archived = self._memory_manager.consolidate()
+        logger.info(f"✓ consolidation complete: {archived} entries archived")
+        return archived
 
     # -- retrieval -----------------------------------------------------------
 
@@ -401,8 +413,10 @@ class Orchestrator:
         if self.is_sleeping:
             raise RuntimeError("Being is already sleeping. Call wake() first.")
 
+        logger.info(f"😴 sleep: starting continuous AIXI dreaming (num_rollouts={num_rollouts}, svd_rank={svd_rank})")
         # Retrieve recent episodes
         episodes = self._relational.get_episodes(self._personality.being_id, limit=100)
+        logger.info(f"  → Retrieved {len(episodes)} episodes for dreaming")
 
         # Create the sleep cycle (NeuralEngine shared from orchestrator)
         dream_engine = DreamEngine(seed=seed, neural_engine=self._neural)
@@ -412,6 +426,7 @@ class Orchestrator:
 
         def _sleep_worker() -> None:
             try:
+                logger.info(f"  → Sleep worker started")
                 new_state, result = cycle.run_continuous(
                     self._personality,
                     episodes,
@@ -453,18 +468,18 @@ class Orchestrator:
             was not sleeping.
         """
         if not self.is_sleeping:
+            logger.info(f"⏰ wake: Being was not sleeping")
             result = self._sleep_result
             self._sleep_result = None
             return result
 
+        logger.info(f"⏰ wake: requesting stop (timeout={timeout}s)")
         self._sleep_cycle.request_stop()
         self._sleep_thread.join(timeout=timeout)
 
         if self._sleep_thread.is_alive():
             logger.warning(
-                "Sleep thread for Being %s did not finish within %.1fs",
-                self.being_id,
-                timeout,
+                f"🚨 Wake timeout: sleep thread for Being {self.being_id} did not finish within {timeout}s",
             )
 
         with self._sleep_lock:
@@ -474,7 +489,30 @@ class Orchestrator:
         self._sleep_thread = None
         self._sleep_cycle = None
 
-        logger.info("Being %s woke up", self.being_id)
+        if result:
+            if result.training_result is not None:
+                logger.info(
+                    "✓ Being %s woke up: cycles=%d, facts=%d, beliefs=%d, hypotheses=%d, training(vocab=%d, patterns=%d, entropy=%.4f)",
+                    self.being_id,
+                    result.cycles_completed,
+                    len(result.facts_extracted),
+                    len(result.beliefs_added),
+                    len(result.hypotheses),
+                    result.training_result.vocabulary_size,
+                    result.training_result.pattern_count,
+                    result.training_result.attention_entropy,
+                )
+            else:
+                logger.info(
+                    "✓ Being %s woke up: cycles=%d, facts=%d, beliefs=%d, hypotheses=%d",
+                    self.being_id,
+                    result.cycles_completed,
+                    len(result.facts_extracted),
+                    len(result.beliefs_added),
+                    len(result.hypotheses),
+                )
+        else:
+            logger.info(f"✓ Being {self.being_id} woke up (no results)")
         return result
 
     def sleep_once(
@@ -503,8 +541,10 @@ class Orchestrator:
         SleepResult
             Metadata about the sleep cycle.
         """
+        logger.info(f"😴 sleep_once: single synchronous cycle (num_rollouts={num_rollouts}, svd_rank={svd_rank})")
         # Retrieve recent episodes
         episodes = self._relational.get_episodes(self._personality.being_id, limit=100)
+        logger.info(f"  → Retrieved {len(episodes)} episodes for dreaming")
 
         # Run the sleep cycle (NeuralEngine shared from orchestrator)
         dream_engine = DreamEngine(seed=seed, neural_engine=self._neural)
@@ -522,6 +562,7 @@ class Orchestrator:
 
         # Persist the updated personality
         self._personality_engine._persist(self._personality)
+        logger.info(f"✓ sleep_once complete: facts={len(result.facts_extracted)}, beliefs={len(result.beliefs_added)}, hypotheses={len(result.hypotheses)}")
 
         return result
 

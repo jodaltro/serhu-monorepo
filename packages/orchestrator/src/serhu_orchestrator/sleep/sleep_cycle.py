@@ -147,17 +147,22 @@ class SleepCycle:
         tuple[PersonalityState, SleepResult]
             Updated personality state and sleep metadata.
         """
+        logger.info(f"💤 SleepCycle.run(): Starting single-shot cycle")
         result = SleepResult()
 
         # Phase 0: Train NeuralEngine on episodes (self-learning)
+        logger.info(f"  Phase 0: Training NeuralEngine on {len(episodes)} episodes")
         personality_vector = self._flatten_traits(state)
         neural = self.dream_engine.neural_engine
         result.training_result = neural.train(episodes, personality_vector)
 
         # Phase 1: Semantization – extract facts using learned patterns
+        logger.info(f"  Phase 1: Semantizing episodes")
         result.facts_extracted = self._semantize(episodes, state)
+        logger.info(f"    → {len(result.facts_extracted)} facts extracted")
 
         # Phase 2: Dream (REM) – AIXI rollouts
+        logger.info(f"  Phase 2: Dream REM ({num_rollouts} rollouts)")
         result.traits_before = list(personality_vector)
 
         result.hypotheses = self.dream_engine.perform_dream_rollouts(
@@ -166,20 +171,25 @@ class SleepCycle:
             num_rollouts=num_rollouts,
             personality_summary=self._build_personality_summary(state),
         )
+        logger.info(f"    → {len(result.hypotheses)} hypotheses generated")
 
         # Phase 3: Consolidation (NREM) – SVD dream pruning
+        logger.info(f"  Phase 3: Consolidation NREM (SVD rank={svd_rank})")
         consolidated = DreamEngine.dream_pruning(
             personality_vector, target_rank=svd_rank
         )
         result.traits_after = consolidated
 
         # Phase 4: Ledger update – apply consolidated traits + beliefs
+        logger.info(f"  Phase 4: Ledger update")
         state = self._apply_consolidated_traits(state, consolidated)
         new_beliefs = self._extract_beliefs(result.hypotheses, state)
         result.beliefs_added = new_beliefs
         state.core_beliefs.extend(new_beliefs)
+        logger.info(f"    → {len(new_beliefs)} beliefs added")
 
         result.cycles_completed = 1
+        logger.info(f"✓ SleepCycle.run() complete: facts={len(result.facts_extracted)}, hypotheses={len(result.hypotheses)}, beliefs={len(result.beliefs_added)}")
         return state, result
 
     def run_continuous(
@@ -238,7 +248,8 @@ class SleepCycle:
         cycle = 0
         while not self._stop_event.is_set():
             cycle += 1
-            logger.info("Continuous sleep: starting dream cycle %d", cycle)
+            if cycle == 1 or cycle % 500 == 0:
+                logger.info("Continuous sleep: dream cycle checkpoint=%d", cycle)
 
             # Dream (REM) – AIXI rollouts
             personality_vector = self._flatten_traits(state)
