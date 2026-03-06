@@ -17,6 +17,10 @@ from serhu_api.schemas import (
     ContextWindowResponse,
     SleepRequest,
     SleepResponse,
+    SleepOnceRequest,
+    SleepOnceResponse,
+    WakeRequest,
+    WakeResponse,
     RecallRequest,
     RecallResponse,
     LearnFactRequest,
@@ -44,6 +48,7 @@ def _being_response(orch) -> BeingResponse:
         cognitive_age=p.development.cognitive_age,
         erikson_conflict=p.development.erikson_conflict,
         interaction_count=p.development.interaction_count,
+        is_sleeping=orch.is_sleeping,
     )
 
 
@@ -148,14 +153,50 @@ def consolidate(being_id: str):
 
 @router.post("/{being_id}/sleep", response_model=SleepResponse)
 def sleep(being_id: str, body: SleepRequest):
-    """Trigger a full sleep cycle (NREM + REM)."""
+    """Start continuous AIXI dreaming (runs until wake is called)."""
     orch = _get_orch(being_id)
-    result = orch.sleep(
+    try:
+        orch.sleep(
+            num_rollouts=body.num_rollouts,
+            svd_rank=body.svd_rank,
+            seed=body.seed,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return SleepResponse(is_sleeping=True)
+
+
+@router.post("/{being_id}/wake", response_model=WakeResponse)
+def wake(being_id: str, body: WakeRequest | None = None):
+    """Wake the Being from continuous sleep and retrieve results."""
+    orch = _get_orch(being_id)
+    timeout = body.timeout if body else 30.0
+    result = orch.wake(timeout=timeout)
+    if result is None:
+        return WakeResponse(
+            facts_extracted=0,
+            beliefs_added=0,
+            hypotheses_generated=0,
+            cycles_completed=0,
+        )
+    return WakeResponse(
+        facts_extracted=len(result.facts_extracted),
+        beliefs_added=len(result.beliefs_added),
+        hypotheses_generated=len(result.hypotheses),
+        cycles_completed=result.cycles_completed,
+    )
+
+
+@router.post("/{being_id}/sleep-once", response_model=SleepOnceResponse)
+def sleep_once(being_id: str, body: SleepOnceRequest):
+    """Trigger a single synchronous sleep cycle (backward-compatible)."""
+    orch = _get_orch(being_id)
+    result = orch.sleep_once(
         num_rollouts=body.num_rollouts,
         svd_rank=body.svd_rank,
         seed=body.seed,
     )
-    return SleepResponse(
+    return SleepOnceResponse(
         facts_extracted=len(result.facts_extracted),
         beliefs_added=len(result.beliefs_added),
         hypotheses_generated=len(result.hypotheses),

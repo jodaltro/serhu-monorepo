@@ -106,9 +106,7 @@ class TestLocalE2ELifecycle:
                 "being", f"Concordo, o universo é bonito e bonito {i}"
             )
 
-        result = mock_orchestrator.sleep(num_rollouts=50, svd_rank=4, seed=42)
-
-        # Sleep cycle produces structured output
+        result = mock_orchestrator.sleep_once(num_rollouts=50, svd_rank=4, seed=42)
         assert isinstance(result.traits_before, list)
         assert isinstance(result.traits_after, list)
         assert len(result.traits_before) == 72  # HEXACO(24)+TCI-T(16)+TCI-C(13)+Schwartz(19)
@@ -189,7 +187,7 @@ class TestLocalE2ELifecycle:
         assert archived >= 0
 
         # 4. Sleep cycle
-        result = orch.sleep(num_rollouts=50, svd_rank=4, seed=42)
+        result = orch.sleep_once(num_rollouts=50, svd_rank=4, seed=42)
         assert len(result.traits_before) == 72
         assert len(result.traits_after) == 72
 

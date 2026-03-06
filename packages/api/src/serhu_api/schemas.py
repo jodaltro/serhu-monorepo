@@ -31,6 +31,10 @@ class BeingResponse(BaseModel):
     cognitive_age: float = Field(description="Cognitive age in months")
     erikson_conflict: str = Field(description="Current Erikson psychosocial conflict")
     interaction_count: int
+    is_sleeping: bool = Field(
+        default=False,
+        description="Whether the Being is currently in continuous sleep mode",
+    )
 
 
 # -- Chat -------------------------------------------------------------------
@@ -87,7 +91,40 @@ class SleepRequest(BaseModel):
 
 
 class SleepResponse(BaseModel):
-    """Response from a sleep cycle."""
+    """Response from starting continuous sleep."""
+
+    is_sleeping: bool = Field(description="Whether the Being is now sleeping")
+
+
+class WakeRequest(BaseModel):
+    """Request body for waking a Being from sleep."""
+
+    timeout: float = Field(
+        default=30.0,
+        ge=1.0,
+        description="Max seconds to wait for the sleep thread to finish",
+    )
+
+
+class WakeResponse(BaseModel):
+    """Response from waking a Being."""
+
+    facts_extracted: int
+    beliefs_added: int
+    hypotheses_generated: int
+    cycles_completed: int
+
+
+class SleepOnceRequest(BaseModel):
+    """Request body for triggering a single-shot sleep cycle."""
+
+    num_rollouts: int = Field(default=1000, ge=1)
+    svd_rank: int = Field(default=8, ge=1)
+    seed: int | None = Field(default=None)
+
+
+class SleepOnceResponse(BaseModel):
+    """Response from a single-shot sleep cycle."""
 
     facts_extracted: int
     beliefs_added: int

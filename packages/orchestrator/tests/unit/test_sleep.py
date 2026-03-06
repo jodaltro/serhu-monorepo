@@ -218,3 +218,133 @@ class TestSleepCycleRun:
         # Check that clamping was applied
         assert state.hexaco.sincerity == 1.0  # clamped from 1.5
         assert state.tci_temperament.exploratory_excitability == 0.0  # clamped from -0.1
+
+    def test_run_returns_cycles_completed_one(self):
+        state = self._make_state()
+        episodes = [{"content": "Hello"}]
+        cycle = SleepCycle(dream_engine=DreamEngine(seed=42))
+        _, result = cycle.run(state, episodes, num_rollouts=10, svd_rank=4)
+        assert result.cycles_completed == 1
+
+
+# ---------------------------------------------------------------------------
+# Continuous Sleep tests
+# ---------------------------------------------------------------------------
+
+
+class TestSleepCycleContinuous:
+    """Tests for the continuous (infinite AIXI) sleep mode."""
+
+    def _make_state(self) -> PersonalityState:
+        return PersonalityState(being_id="continuous-test", name="Dreamer")
+
+    def test_continuous_runs_multiple_cycles(self):
+        """Continuous mode runs more than one cycle before stop."""
+        state = self._make_state()
+        episodes = [
+            {"content": "I love music and music is great"},
+            {"content": "Music makes me happy"},
+        ]
+        cycle = SleepCycle(dream_engine=DreamEngine(seed=42))
+
+        # Stop after 3 cycles via on_cycle callback
+        def stop_after_3(cycle_num, _state):
+            if cycle_num >= 3:
+                cycle.request_stop()
+
+        new_state, result = cycle.run_continuous(
+            state, episodes, num_rollouts=10, svd_rank=4, on_cycle=stop_after_3
+        )
+
+        assert result.cycles_completed == 3
+        assert isinstance(new_state, PersonalityState)
+        assert len(result.traits_before) == 72
+        assert len(result.traits_after) == 72
+
+    def test_continuous_accumulates_beliefs(self):
+        """Each cycle adds beliefs to the accumulated result."""
+        state = self._make_state()
+        episodes = [{"content": "The world is beautiful"}]
+        cycle = SleepCycle(dream_engine=DreamEngine(seed=42))
+
+        def stop_after_2(cycle_num, _state):
+            if cycle_num >= 2:
+                cycle.request_stop()
+
+        new_state, result = cycle.run_continuous(
+            state, episodes, num_rollouts=10, svd_rank=4, on_cycle=stop_after_2
+        )
+
+        assert result.cycles_completed == 2
+        # Beliefs accumulate across cycles (extend, not replace)
+        assert len(result.beliefs_added) >= 1
+
+    def test_continuous_stops_immediately_if_pre_stopped(self):
+        """If stop is requested before starting, zero cycles run."""
+        state = self._make_state()
+        episodes = [{"content": "test"}]
+        cycle = SleepCycle(dream_engine=DreamEngine(seed=42))
+        cycle.request_stop()  # Pre-stop
+
+        _, result = cycle.run_continuous(
+            state, episodes, num_rollouts=10, svd_rank=4
+        )
+
+        assert result.cycles_completed == 0
+
+    def test_continuous_semantizes_once(self):
+        """Semantization only occurs once at the start."""
+        state = self._make_state()
+        episodes = [
+            {"content": "I love music and music is great"},
+            {"content": "Music makes me happy"},
+        ]
+        cycle = SleepCycle(dream_engine=DreamEngine(seed=42))
+
+        def stop_after_2(cycle_num, _state):
+            if cycle_num >= 2:
+                cycle.request_stop()
+
+        _, result = cycle.run_continuous(
+            state, episodes, num_rollouts=10, svd_rank=4, on_cycle=stop_after_2
+        )
+
+        # Facts should be extracted (from semantization)
+        assert len(result.facts_extracted) >= 1
+        assert any("music" in f.lower() for f in result.facts_extracted)
+
+    def test_request_stop_and_stop_requested(self):
+        """request_stop() sets the stop flag; stop_requested reflects it."""
+        cycle = SleepCycle()
+        assert cycle.stop_requested is False
+        cycle.request_stop()
+        assert cycle.stop_requested is True
+
+    def test_continuous_from_thread_with_stop(self):
+        """Continuous mode can be stopped from another thread."""
+        import threading
+        import time
+
+        state = self._make_state()
+        episodes = [{"content": "Deep dreaming"}]
+        cycle = SleepCycle(dream_engine=DreamEngine(seed=42))
+
+        result_holder: list[tuple[PersonalityState, SleepResult]] = []
+
+        def worker():
+            r = cycle.run_continuous(
+                state, episodes, num_rollouts=10, svd_rank=4
+            )
+            result_holder.append(r)
+
+        t = threading.Thread(target=worker)
+        t.start()
+
+        # Let it run for a short while
+        time.sleep(0.3)
+        cycle.request_stop()
+        t.join(timeout=5.0)
+
+        assert len(result_holder) == 1
+        _, result = result_holder[0]
+        assert result.cycles_completed >= 1

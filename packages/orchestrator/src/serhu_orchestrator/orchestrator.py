@@ -6,8 +6,11 @@ together, implementing the MemGPT-like "operating system" for the Being's mind.
 Lifecycle phases:
     1. **Wakefulness** – Active interaction via ``process_message()`` or ``chat()``.
     2. **Twilight**    – Consolidation via ``consolidate()``.
-    3. **Sleep NREM**  – SVD rank-reduction / dream pruning via ``sleep()``.
-    4. **Sleep REM**   – AIXI hypothesis generation via ``sleep()``.
+    3. **Sleep**       – Continuous AIXI dreaming via ``sleep()``.
+       The sleep runs indefinitely (as AIXI should be) until
+       ``wake()`` is called or the user interacts again.
+    4. **Wake**        – ``wake()`` stops the sleep loop and returns
+       accumulated dream results.
 
 When an ``LLMClient`` is provided (e.g. ``OpenAIClient`` for GPT-5.4),
 the Orchestrator can:
@@ -29,6 +32,9 @@ References:
 
 from __future__ import annotations
 
+import logging
+import threading
+
 from serhu_orchestrator.memory.working_memory import WorkingMemory
 from serhu_orchestrator.memory.archival_memory import ArchivalMemory
 from serhu_orchestrator.memory.relational_memory import RelationalMemory
@@ -38,6 +44,8 @@ from serhu_orchestrator.personality.prompt_builder import build_system_prompt
 from serhu_orchestrator.personality.types import PersonalityState
 from serhu_orchestrator.sleep.dream_engine import DreamEngine
 from serhu_orchestrator.sleep.sleep_cycle import SleepCycle, SleepResult
+
+logger = logging.getLogger(__name__)
 
 
 class Orchestrator:
@@ -121,6 +129,12 @@ class Orchestrator:
             embed_fn=embed_fn,
         )
 
+        # -- continuous sleep state ------------------------------------------
+        self._sleep_thread: threading.Thread | None = None
+        self._sleep_cycle: SleepCycle | None = None
+        self._sleep_result: SleepResult | None = None
+        self._sleep_lock = threading.Lock()
+
     # -- properties ----------------------------------------------------------
 
     @property
@@ -130,6 +144,14 @@ class Orchestrator:
     @property
     def personality(self) -> PersonalityState:
         return self._personality
+
+    @property
+    def is_sleeping(self) -> bool:
+        """Whether the Being is currently in continuous sleep mode."""
+        return (
+            self._sleep_thread is not None
+            and self._sleep_thread.is_alive()
+        )
 
     # -- wakefulness phase ---------------------------------------------------
 
@@ -141,6 +163,9 @@ class Orchestrator:
         trait_deltas: dict[str, dict[str, float]] | None = None,
     ) -> ContextWindow:
         """Process an incoming message during the wakefulness phase.
+
+        If the Being is currently sleeping, it will be automatically
+        woken up before processing the message.
 
         1. Adds the message to the memory pipeline.
         2. Optionally updates personality traits.
@@ -162,6 +187,9 @@ class Orchestrator:
         ContextWindow
             The assembled context for the LLM.
         """
+        if self.is_sleeping:
+            self.wake()
+
         context = self._memory_manager.add_interaction(role, content, metadata)
 
         if trait_deltas:
@@ -179,6 +207,9 @@ class Orchestrator:
         metadata: dict | None = None,
     ) -> tuple[str, ContextWindow]:
         """Full chat turn: process user message → LLM response → trait analysis.
+
+        If the Being is currently sleeping, it will be automatically
+        woken up before processing the chat message.
 
         This is the high-level wakefulness API that uses the LLM to:
         1. Build a persona-aware system prompt.
@@ -208,6 +239,9 @@ class Orchestrator:
         RuntimeError
             If no LLM client is configured.
         """
+        if self.is_sleeping:
+            self.wake()
+
         if self._llm is None:
             raise RuntimeError(
                 "chat() requires an LLM client. "
@@ -323,13 +357,113 @@ class Orchestrator:
         num_rollouts: int = 1000,
         svd_rank: int = 8,
         seed: int | None = None,
-    ) -> SleepResult:
-        """Execute the full sleep cycle (NREM + REM).
+    ) -> None:
+        """Start continuous AIXI dreaming in the background.
 
-        Orchestrates:
-        1. Retrieve recent episodes from relational memory.
-        2. Run the SleepCycle: semantization → AIXI dreams → SVD consolidation.
-        3. Store extracted facts and persist the updated personality.
+        The sleep runs indefinitely—as AIXI should be—until ``wake()``
+        is called or the user interacts via ``chat()`` / ``process_message()``.
+
+        Call ``wake()`` to stop the sleep and retrieve results.
+
+        Parameters
+        ----------
+        num_rollouts : int
+            Number of AIXI dream rollouts per cycle.
+        svd_rank : int
+            Target rank for SVD dream pruning.
+        seed : int | None
+            Random seed for reproducible dreams.
+
+        Raises
+        ------
+        RuntimeError
+            If the Being is already sleeping.
+        """
+        if self.is_sleeping:
+            raise RuntimeError("Being is already sleeping. Call wake() first.")
+
+        # Retrieve recent episodes
+        episodes = self._relational.get_episodes(self._personality.being_id, limit=100)
+
+        # Create the sleep cycle
+        dream_engine = DreamEngine(seed=seed, llm_client=self._llm)
+        cycle = SleepCycle(dream_engine=dream_engine, llm_client=self._llm)
+        self._sleep_cycle = cycle
+        self._sleep_result = None
+
+        def _sleep_worker() -> None:
+            try:
+                new_state, result = cycle.run_continuous(
+                    self._personality,
+                    episodes,
+                    num_rollouts=num_rollouts,
+                    svd_rank=svd_rank,
+                )
+                with self._sleep_lock:
+                    self._personality = new_state
+                    self._sleep_result = result
+
+                # Store extracted facts
+                for fact in result.facts_extracted:
+                    self._memory_manager.store_semantic_fact(fact)
+
+                # Persist the updated personality
+                self._personality_engine._persist(self._personality)
+            except Exception:
+                logger.exception("Sleep cycle worker failed")
+
+        self._sleep_thread = threading.Thread(
+            target=_sleep_worker, daemon=True, name="serhu-sleep"
+        )
+        self._sleep_thread.start()
+        logger.info("Being %s entered continuous sleep", self.being_id)
+
+    def wake(self, timeout: float = 30.0) -> SleepResult | None:
+        """Wake the Being from continuous sleep.
+
+        Signals the sleep loop to stop after the current cycle, waits
+        for the thread to finish, and returns the accumulated results.
+
+        Parameters
+        ----------
+        timeout : float
+            Maximum seconds to wait for the sleep thread to finish.
+
+        Returns
+        -------
+        SleepResult | None
+            Accumulated sleep metadata, or ``None`` if the Being
+            was not sleeping.
+        """
+        if not self.is_sleeping:
+            result = self._sleep_result
+            self._sleep_result = None
+            return result
+
+        self._sleep_cycle.request_stop()
+        self._sleep_thread.join(timeout=timeout)
+
+        with self._sleep_lock:
+            result = self._sleep_result
+            self._sleep_result = None
+
+        self._sleep_thread = None
+        self._sleep_cycle = None
+
+        logger.info("Being %s woke up", self.being_id)
+        return result
+
+    def sleep_once(
+        self,
+        *,
+        num_rollouts: int = 1000,
+        svd_rank: int = 8,
+        seed: int | None = None,
+    ) -> SleepResult:
+        """Execute a single sleep cycle (backward-compatible).
+
+        For callers that need synchronous, single-shot sleep without
+        the continuous AIXI loop.
 
         Parameters
         ----------

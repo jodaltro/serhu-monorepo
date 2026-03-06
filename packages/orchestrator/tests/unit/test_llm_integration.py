@@ -544,7 +544,7 @@ class TestOrchestratorChat:
             for i in range(5):
                 orch.process_message("user", f"Nature is beautiful {i}")
 
-            result = orch.sleep(num_rollouts=50, svd_rank=4, seed=42)
+            result = orch.sleep_once(num_rollouts=50, svd_rank=4, seed=42)
 
             assert "User loves nature" in result.facts_extracted
             assert "Nature is healing" in result.beliefs_added
