@@ -48,6 +48,7 @@ class TestLLMClientProtocol:
         mock.derive_beliefs = MagicMock(return_value=[])
         mock.generate_dream_hypotheses = MagicMock(return_value=[])
         mock.simulate_dream_rollouts = MagicMock(return_value=[])
+        mock.extract_environment_spec = MagicMock(return_value={})
         assert isinstance(mock, LLMClient)
 
 

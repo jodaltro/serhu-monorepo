@@ -329,6 +329,64 @@ class OpenAIClient:
 
     # -- internal helpers ---------------------------------------------------
 
+    # -- LLMClient.extract_environment_spec ---------------------------------
+
+    def extract_environment_spec(
+        self,
+        episodes: list[dict],
+        personality_summary: str,
+    ) -> dict:
+        """Extract AIXI environment inputs from episodes and personality.
+
+        Called once at the start of sleep.  Returns a structured dict
+        that ``EnvironmentBuilder._parse_llm_spec()`` converts into an
+        ``EnvironmentSpec``.
+        """
+        episode_texts = []
+        for ep in episodes[-30:]:
+            role = ep.get("role", "unknown")
+            content = ep.get("content", "")
+            episode_texts.append(f"[{role}] {content}")
+
+        episodes_block = "\n".join(episode_texts)
+
+        extraction_prompt = (
+            "You are an ENVIRONMENT DESIGNER for a synthetic Being's AIXI dream cycle.\n"
+            "Analyze the Being's personality and interaction history to design a "
+            "reinforcement learning environment for dream simulation.\n\n"
+            "From the episodes and personality, extract:\n"
+            "1. **actions**: A list of 8-15 specific actions the Being can take "
+            "(e.g. 'explore_nature', 'ask_about_feelings', 'discuss_music').\n"
+            "2. **observations**: A list of 6-12 possible observations/states "
+            "(e.g. 'user_happy', 'user_curious', 'topic_nature').\n"
+            "3. **reward_signals**: A dict mapping action/observation patterns to "
+            "reward values (-1.0 to 1.0) based on what's good for this Being.\n"
+            "4. **transition_weights**: For each action, a list of "
+            "[observation, probability] pairs showing likely outcomes.\n"
+            "5. **horizon**: How many steps ahead to simulate (5-20).\n"
+            "6. **gamma**: Temporal discount factor (0.8-0.99).\n\n"
+            "Rules:\n"
+            "- Actions should reflect the Being's learned topics and capabilities.\n"
+            "- Observations should reflect the user's typical states and reactions.\n"
+            "- Rewards should align with the Being's personality and values.\n"
+            "- Return ONLY valid JSON.\n\n"
+            f"Being personality summary:\n{personality_summary}\n\n"
+            f"Recent episodes:\n{episodes_block}\n\n"
+            "Return the environment specification as JSON:"
+        )
+
+        response = self._client.chat.completions.create(
+            model=self._model,
+            messages=[{"role": "user", "content": extraction_prompt}],
+            temperature=0.3,
+            max_completion_tokens=1024,
+        )
+
+        raw = response.choices[0].message.content or "{}"
+        return self._parse_environment_spec(raw)
+
+    # -- internal helpers ---------------------------------------------------
+
     @staticmethod
     def _strip_code_fence(raw: str) -> str:
         """Remove markdown code fences from LLM output."""
@@ -418,3 +476,19 @@ class OpenAIClient:
                 "Failed to parse rollout results from LLM response: %s", raw[:200]
             )
             return []
+
+    @staticmethod
+    def _parse_environment_spec(raw: str) -> dict:
+        """Parse environment specification from LLM JSON output."""
+        try:
+            cleaned = OpenAIClient._strip_code_fence(raw)
+            data = json.loads(cleaned)
+            if isinstance(data, dict):
+                return data
+            return {}
+        except (json.JSONDecodeError, ValueError):
+            logger.warning(
+                "Failed to parse environment spec from LLM response: %s",
+                raw[:200],
+            )
+            return {}

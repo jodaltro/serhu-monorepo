@@ -1,10 +1,12 @@
 """Sleep Cycle – Orchestrates the Being's offline processing phases.
 
 Implements a state-machine-like sleep cycle inspired by AWS Step Functions:
+0. **Environment Build** – LLM extracts AIXI inputs (one-shot) or
+                           NeuralEngine derives them from learned patterns.
 1. **Training**       – NeuralEngine learns from episodic memories
                         (transformer-inspired self-attention and pattern mining).
 2. **Semantization**  – Extract semantic facts using learned patterns.
-3. **Dream (REM)**    – AIXI rollouts to generate and evaluate hypotheses.
+3. **Dream (REM)**    – AIXI rollouts against the built environment.
 4. **Consolidation (NREM)** – SVD dream pruning of personality vectors.
 5. **Ledger Update**  – Persist evolved personality and beliefs.
 
@@ -17,9 +19,9 @@ The sleep cycle supports two execution modes:
   dream cycle, accumulating hypotheses, beliefs, and personality
   refinements across iterations.
 
-The Being learns from its own experiences via the NeuralEngine –
-no external LLM dependency required.  The sleep cycle IS the Being's
-mechanism for building its own internal language model.
+The LLM is used **only once at the start** of sleep to extract the
+environment inputs (actions, observations, rewards, transitions).
+All subsequent AIXI rollouts run autonomously without external calls.
 
 References:
     - MemGPT semantization: https://informationmatters.org/2025/10/memgpt-engineering-semantic-memory/
@@ -37,6 +39,7 @@ import threading
 from dataclasses import dataclass, field
 
 from serhu_orchestrator.personality.types import PersonalityState
+from serhu_orchestrator.sleep.aixi_environment import EnvironmentSpec
 from serhu_orchestrator.sleep.dream_engine import DreamEngine, Hypothesis
 from serhu_orchestrator.sleep.neural_engine import NeuralEngine, TrainingResult
 
@@ -65,6 +68,9 @@ class SleepResult:
     training_result : TrainingResult | None
         Metrics from the NeuralEngine training phase (vocabulary size,
         pattern count, attention entropy).
+    environment_spec : EnvironmentSpec | None
+        The AIXI environment specification built at sleep start
+        (from LLM or NeuralEngine).
     """
 
     facts_extracted: list[str] = field(default_factory=list)
@@ -74,6 +80,7 @@ class SleepResult:
     traits_after: list[float] = field(default_factory=list)
     cycles_completed: int = 0
     training_result: TrainingResult | None = None
+    environment_spec: EnvironmentSpec | None = None
 
 
 class SleepCycle:
@@ -81,23 +88,25 @@ class SleepCycle:
 
     Supports two execution modes:
 
-    - **Single-shot** (``run``): One complete training → semantization →
-      dream → consolidation → belief cycle.
+    - **Single-shot** (``run``): One complete environment build →
+      training → semantization → dream → consolidation → belief cycle.
     - **Continuous** (``run_continuous``): Loops indefinitely, running
       AIXI rollouts in every iteration, until ``request_stop()`` is
       called.  This models the AIXI ideal of an agent that never stops
       dreaming until external intervention.
 
-    The Being learns from its own experiences via the ``NeuralEngine`` –
-    no external LLM dependency.  The sleep cycle IS the mechanism for
-    building the Being's internal language model.
+    The LLM (if provided) is used **only at the start** of sleep to
+    build the AIXI environment specification.  All subsequent rollouts
+    run autonomously using the built environment.
 
     Parameters
     ----------
     dream_engine : DreamEngine
         The engine for dream rollouts and SVD consolidation.
     llm_client : object | None
-        **Deprecated.** Ignored for backward compatibility.
+        LLM client for one-shot environment extraction at sleep start.
+        Only used for ``extract_environment_spec()`` — no other LLM
+        calls are made during the sleep cycle.
     """
 
     # Canonical ordering of personality models for vector flattening.
@@ -150,19 +159,27 @@ class SleepCycle:
         logger.info(f"💤 SleepCycle.run(): Starting single-shot cycle")
         result = SleepResult()
 
-        # Phase 0: Train NeuralEngine on episodes (self-learning)
-        logger.info(f"  Phase 0: Training NeuralEngine on {len(episodes)} episodes")
+        # Phase 0: Build AIXI environment (LLM used only here, if available)
+        logger.info(f"  Phase 0: Building AIXI environment")
         personality_vector = self._flatten_traits(state)
+        personality_summary = self._build_personality_summary(state)
+        env_spec = self.dream_engine.build_environment(
+            episodes, personality_vector, personality_summary
+        )
+        result.environment_spec = env_spec
+
+        # Phase 1: Train NeuralEngine on episodes (self-learning)
+        logger.info(f"  Phase 1: Training NeuralEngine on {len(episodes)} episodes")
         neural = self.dream_engine.neural_engine
         result.training_result = neural.train(episodes, personality_vector)
 
-        # Phase 1: Semantization – extract facts using learned patterns
-        logger.info(f"  Phase 1: Semantizing episodes")
+        # Phase 2: Semantization – extract facts using learned patterns
+        logger.info(f"  Phase 2: Semantizing episodes")
         result.facts_extracted = self._semantize(episodes, state)
         logger.info(f"    → {len(result.facts_extracted)} facts extracted")
 
-        # Phase 2: Dream (REM) – AIXI rollouts
-        logger.info(f"  Phase 2: Dream REM ({num_rollouts} rollouts)")
+        # Phase 3: Dream (REM) – AIXI rollouts against built environment
+        logger.info(f"  Phase 3: Dream REM ({num_rollouts} rollouts)")
         result.traits_before = list(personality_vector)
 
         result.hypotheses = self.dream_engine.perform_dream_rollouts(
@@ -173,15 +190,15 @@ class SleepCycle:
         )
         logger.info(f"    → {len(result.hypotheses)} hypotheses generated")
 
-        # Phase 3: Consolidation (NREM) – SVD dream pruning
-        logger.info(f"  Phase 3: Consolidation NREM (SVD rank={svd_rank})")
+        # Phase 4: Consolidation (NREM) – SVD dream pruning
+        logger.info(f"  Phase 4: Consolidation NREM (SVD rank={svd_rank})")
         consolidated = DreamEngine.dream_pruning(
             personality_vector, target_rank=svd_rank
         )
         result.traits_after = consolidated
 
-        # Phase 4: Ledger update – apply consolidated traits + beliefs
-        logger.info(f"  Phase 4: Ledger update")
+        # Phase 5: Ledger update – apply consolidated traits + beliefs
+        logger.info(f"  Phase 5: Ledger update")
         state = self._apply_consolidated_traits(state, consolidated)
         new_beliefs = self._extract_beliefs(result.hypotheses, state)
         result.beliefs_added = new_beliefs
@@ -234,12 +251,19 @@ class SleepCycle:
         if self._stop_event.is_set():
             return state, result
 
-        # Phase 0 (once): Train NeuralEngine on episodes
+        # Phase 0 (once): Build AIXI environment (LLM used only here)
         personality_vector = self._flatten_traits(state)
+        personality_summary = self._build_personality_summary(state)
+        env_spec = self.dream_engine.build_environment(
+            episodes, personality_vector, personality_summary
+        )
+        result.environment_spec = env_spec
+
+        # Phase 1 (once): Train NeuralEngine on episodes
         neural = self.dream_engine.neural_engine
         result.training_result = neural.train(episodes, personality_vector)
 
-        # Phase 1 (once): Semantization – extract facts using learned patterns
+        # Phase 2 (once): Semantization – extract facts using learned patterns
         result.facts_extracted = self._semantize(episodes, state)
 
         # Record initial traits

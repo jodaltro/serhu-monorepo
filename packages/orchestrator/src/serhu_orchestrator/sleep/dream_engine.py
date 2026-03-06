@@ -3,10 +3,11 @@
 Implements the two core sleep phases:
 1. **REM (Dreaming)**: Monte-Carlo AIXI-CTW rollouts that generate
    hypothetical future interactions, scored by coherence.
-   When a ``NeuralEngine`` is available, hypothesis generation uses
-   transformer-inspired self-attention and pattern mining over episodic
-   data (Solomonoff Induction without external LLM).  Otherwise, the
-   engine uses random Monte-Carlo rollouts.
+   Rollouts run against an ``AixiEnvironment`` (reset/step interface)
+   built at sleep start from LLM-extracted inputs or NeuralEngine
+   patterns.  The LLM is used *only once* at the beginning of sleep
+   to produce the environment specification; all subsequent rollouts
+   are autonomous.
 2. **NREM (Consolidation)**: SVD rank-reduction applied to personality
    trait vectors, eliminating noise and crystallising intuition.
 
@@ -28,6 +29,11 @@ import random
 from dataclasses import dataclass, field
 
 
+from serhu_orchestrator.sleep.aixi_environment import (
+    AixiEnvironment,
+    EnvironmentBuilder,
+    EnvironmentSpec,
+)
 from serhu_orchestrator.sleep.neural_engine import NeuralEngine, TrainingResult
 
 
@@ -54,15 +60,18 @@ class Hypothesis:
 
 
 class DreamEngine:
-    """Generates dream hypotheses and consolidates personality via SVD.
+    """Generates dream hypotheses via AIXI rollouts and consolidates personality via SVD.
 
-    When a ``NeuralEngine`` is available (default), hypothesis generation
-    uses transformer-inspired self-attention and pattern mining over
-    episodic data (Solomonoff Induction without external LLM).  The
-    NeuralEngine builds an internal language model from the Being's own
-    experiences during sleep.
+    Rollouts are executed against an ``AixiEnvironment`` that provides
+    the standard RL interface (``reset``/``step``).  The environment is
+    built once at the start of sleep from:
 
-    Without a NeuralEngine, the engine uses random Monte-Carlo rollouts.
+    - **LLM-extracted inputs** (when an ``llm_client`` is provided):
+      The LLM analyzes the Being's episodes and personality to produce
+      a rich ``EnvironmentSpec`` with actions, observations, rewards,
+      and transition probabilities.  This is the *only* LLM call.
+    - **NeuralEngine patterns** (fallback): The Being's self-learned
+      vocabulary and n-gram patterns are used to derive the environment.
 
     Parameters
     ----------
@@ -70,11 +79,12 @@ class DreamEngine:
         Random seed for reproducible dream rollouts.
     neural_engine : NeuralEngine | None
         Transformer-inspired self-learning engine.  When provided, enables
-        pattern-based hypothesis generation from episodic data.
+        pattern-based environment derivation from episodic data.
         A new engine is created automatically if not provided.
     llm_client : object | None
-        **Deprecated.** Ignored for backward compatibility.  The Being
-        now learns from its own experiences via the NeuralEngine.
+        LLM client for one-shot environment extraction at sleep start.
+        Only used for ``extract_environment_spec()`` — no other LLM
+        calls are made during rollouts.
     """
 
     def __init__(
@@ -85,8 +95,11 @@ class DreamEngine:
         llm_client: object | None = None,
     ) -> None:
         self._rng = random.Random(seed)
+        self._seed = seed
         self._neural = neural_engine or NeuralEngine(seed=seed)
+        self._llm_client = llm_client
         self._training_result: TrainingResult | None = None
+        self._environment_spec: EnvironmentSpec | None = None
 
     @property
     def neural_engine(self) -> NeuralEngine:
@@ -97,6 +110,63 @@ class DreamEngine:
     def last_training_result(self) -> TrainingResult | None:
         """Result of the most recent neural training cycle."""
         return self._training_result
+
+    @property
+    def environment_spec(self) -> EnvironmentSpec | None:
+        """The environment spec used for the latest rollouts."""
+        return self._environment_spec
+
+    # -- Environment building (LLM used only here) --------------------------
+
+    def build_environment(
+        self,
+        episodes: list[dict],
+        personality_vector: list[float],
+        personality_summary: str = "",
+    ) -> EnvironmentSpec:
+        """Build the AIXI environment from LLM or NeuralEngine.
+
+        This is the **only** step that may call the LLM.  If an
+        ``llm_client`` is available, it extracts a rich environment
+        specification from the episodes and personality.  Otherwise,
+        the NeuralEngine's learned patterns are used.
+
+        Parameters
+        ----------
+        episodes : list[dict]
+            Recent episodic memory entries.
+        personality_vector : list[float]
+            Flattened personality trait vector.
+        personality_summary : str
+            Compact personality summary for LLM context.
+
+        Returns
+        -------
+        EnvironmentSpec
+            The built environment specification.
+        """
+        if self._llm_client is not None:
+            logger.info("  Building AIXI environment from LLM (one-shot)")
+            self._environment_spec = EnvironmentBuilder.from_llm(
+                self._llm_client,
+                episodes,
+                personality_summary,
+                personality_vector,
+            )
+        else:
+            logger.info("  Building AIXI environment from NeuralEngine")
+            self._environment_spec = EnvironmentBuilder.from_neural_engine(
+                self._neural, episodes, personality_vector
+            )
+
+        logger.info(
+            "  Environment: %d actions, %d observations, horizon=%d, gamma=%.2f",
+            len(self._environment_spec.actions),
+            len(self._environment_spec.observations),
+            self._environment_spec.horizon,
+            self._environment_spec.gamma,
+        )
+        return self._environment_spec
 
     # -- REM phase: AIXI rollouts -------------------------------------------
 
@@ -111,13 +181,17 @@ class DreamEngine:
     ) -> list[Hypothesis]:
         """Simulate future interactions using MC-AIXI-CTW-inspired rollouts.
 
-        The NeuralEngine trains on episodic data and generates hypotheses:
-        1. **Self-Attention Training**: Builds TF-IDF vocabulary and
-           attention matrix over episodes (transformer-inspired).
-        2. **Pattern-Based Hypotheses**: Generates hypotheses from learned
-           n-gram patterns and attention clusters.
-        3. **Random Diversity**: Remaining rollout slots are filled with
-           random Monte-Carlo hypotheses for exploration breadth.
+        Rollouts are executed against the ``AixiEnvironment``:
+
+        1. **Environment Build** (if not already built): Derives the
+           environment spec from LLM or NeuralEngine patterns.
+        2. **NeuralEngine Training**: Trains on episodic data for
+           action selection guidance.
+        3. **AIXI Rollouts**: For each rollout, resets the environment
+           and executes a sequence of ``step(action)`` calls, accumulating
+           discounted reward.  Action selection uses NeuralEngine patterns
+           for exploitation and random exploration for diversity.
+        4. **Top-k Selection**: Returns the best hypotheses by reward.
 
         Parameters
         ----------
@@ -130,72 +204,113 @@ class DreamEngine:
         top_k : int
             Number of best hypotheses to retain.
         personality_summary : str
-            Compact personality summary (unused, kept for backward compat).
+            Compact personality summary for environment building.
 
         Returns
         -------
         list[Hypothesis]
             Top-k hypotheses sorted by reward (descending).
         """
-        hypotheses: list[Hypothesis] = []
+        # Step 1: Ensure environment is built
+        if self._environment_spec is None:
+            self.build_environment(history, personality_vector, personality_summary)
 
-        # Phase 1: NeuralEngine-powered hypotheses (self-learning)
+        spec = self._environment_spec
+        assert spec is not None
+
+        # Step 2: Train NeuralEngine for action selection guidance
         try:
             self._training_result = self._neural.train(history, personality_vector)
-            neural_hypothesis_texts = self._neural.generate_hypotheses(
-                history, personality_vector, num_hypotheses=top_k
-            )
-            # Score each neural hypothesis using the learned model
-            for h_text in neural_hypothesis_texts:
-                h_tokens = set(self._neural._tokenize_text(h_text))
-                vocab_support = sum(
-                    self._neural._vocabulary.get(t, 0.0) for t in h_tokens
-                )
-                complexity = len(h_text) / 200.0
-                reward = vocab_support - math.log(complexity + 1.0)
-                hypotheses.append(
-                    Hypothesis(action=h_text, reward=reward, complexity=complexity)
-                )
         except Exception:
             logger.warning(
-                "Neural engine training failed, using random rollouts only",
+                "Neural engine training failed, using random action selection",
                 exc_info=True,
             )
 
-        # Phase 2: Fill remaining slots with random Monte-Carlo rollouts
-        remaining = max(num_rollouts - len(hypotheses), 0)
-        if remaining > 0:
-            random_hypotheses = self._random_rollouts(
-                history, personality_vector, remaining, top_k
+        # Step 3: Run AIXI rollouts against the environment
+        hypotheses: list[Hypothesis] = []
+        env = AixiEnvironment(spec, personality_vector, seed=self._seed)
+
+        for i in range(num_rollouts):
+            obs = env.reset()
+            # Vary the seed per rollout for diversity
+            env._rng = random.Random((self._seed or 0) + i)
+
+            total_reward = 0.0
+            action_trace: list[str] = []
+
+            for t in range(spec.horizon):
+                action = self._select_action(spec, obs, personality_vector, i)
+                obs, reward, done, info = env.step(action)
+                total_reward += reward * (spec.gamma ** t)
+                action_trace.append(action)
+                if done:
+                    break
+
+            # Complexity: based on trace length and uniqueness
+            unique_actions = len(set(action_trace))
+            complexity = unique_actions / max(len(spec.actions), 1)
+
+            hypothesis_text = " → ".join(action_trace)
+            hypotheses.append(
+                Hypothesis(
+                    action=hypothesis_text,
+                    reward=total_reward,
+                    complexity=complexity,
+                )
             )
-            hypotheses.extend(random_hypotheses)
 
         # Return the top-k hypotheses (Ockham: prefer simple + high-reward)
         hypotheses.sort(key=lambda h: h.reward, reverse=True)
         return hypotheses[:top_k]
 
-    def _random_rollouts(
+    def _select_action(
         self,
-        history: list[dict],
+        spec: EnvironmentSpec,
+        observation: str,
         personality_vector: list[float],
-        num_rollouts: int,
-        top_k: int,
-    ) -> list[Hypothesis]:
-        """Original random Monte-Carlo rollouts."""
-        hypotheses: list[Hypothesis] = []
-        context_signal = self._extract_context_signal(history)
+        rollout_idx: int,
+    ) -> str:
+        """Select an action for one step of an AIXI rollout.
 
-        for _ in range(num_rollouts):
-            action, complexity = self._simulate_action(
-                context_signal, personality_vector
-            )
-            reward = self._evaluate_coherence(action, context_signal, complexity)
-            hypotheses.append(
-                Hypothesis(action=action, reward=reward, complexity=complexity)
-            )
+        Uses a mix of NeuralEngine-guided exploitation and random
+        exploration, modulated by the Being's openness/curiosity.
+        """
+        if not spec.actions:
+            return "noop"
 
-        hypotheses.sort(key=lambda h: h.reward, reverse=True)
-        return hypotheses[:top_k]
+        # Exploration probability modulated by personality
+        openness = (
+            personality_vector[20] if len(personality_vector) > 20 else 0.5
+        )
+        explore_prob = 0.3 + 0.4 * openness
+
+        if self._rng.random() < explore_prob:
+            # Explore: random action
+            return self._rng.choice(spec.actions)
+
+        # Exploit: prefer actions related to current observation
+        best_action = spec.actions[0]
+        best_score = -float("inf")
+
+        obs_tokens = set(observation.lower().replace("_", " ").split())
+
+        for action in spec.actions:
+            action_tokens = set(action.lower().replace("_", " ").split())
+            overlap = len(action_tokens & obs_tokens)
+
+            # Reward signal alignment
+            reward_boost = 0.0
+            for pattern, r in spec.reward_signals.items():
+                if pattern.lower() in action.lower():
+                    reward_boost += r
+
+            score = overlap * 0.5 + reward_boost + self._rng.uniform(0, 0.1)
+            if score > best_score:
+                best_score = score
+                best_action = action
+
+        return best_action
 
     # -- NREM phase: SVD consolidation --------------------------------------
 
@@ -287,65 +402,3 @@ class DreamEngine:
                 reconstructed.append(max(0.0, min(1.0, val)))
 
         return reconstructed[:n]
-
-    # -- internal helpers ---------------------------------------------------
-
-    def _extract_context_signal(self, history: list[dict]) -> list[str]:
-        """Extract recent content tokens from episodic history."""
-        recent = history[-20:] if len(history) > 20 else history
-        return [entry.get("content", "") for entry in recent]
-
-    def _simulate_action(
-        self,
-        context: list[str],
-        personality: list[float],
-    ) -> tuple[str, float]:
-        """Generate a simulated action based on context and personality.
-
-        Returns (action_description, complexity_score).
-        """
-        # Personality-weighted topic selection:
-        # Higher openness/curiosity → more diverse topics
-        openness_weight = personality[20] if len(personality) > 20 else 0.5
-        exploration_prob = 0.3 + 0.4 * openness_weight
-
-        if self._rng.random() < exploration_prob and context:
-            # Explore: combine elements from context
-            idx = self._rng.randint(0, len(context) - 1)
-            base = context[idx]
-            action = f"hypothesis_about:{base[:50]}"
-            complexity = len(base) / 100.0
-        else:
-            # Exploit: reinforce existing patterns
-            action = "reinforce_existing_pattern"
-            complexity = 0.1
-
-        return action, complexity
-
-    def _evaluate_coherence(
-        self,
-        action: str,
-        context: list[str],
-        complexity: float,
-    ) -> float:
-        """Score a hypothetical action for coherence with history.
-
-        Implements a simplified Solomonoff prior:
-        reward = base_coherence - log(complexity + 1)
-
-        Simpler hypotheses (lower complexity) receive higher scores,
-        following Ockham's razor / Kolmogorov complexity minimisation.
-        """
-        # Base coherence: overlap with context keywords
-        action_tokens = set(action.lower().split("_"))
-        context_tokens: set[str] = set()
-        for c in context:
-            context_tokens.update(c.lower().split()[:10])
-
-        overlap = len(action_tokens & context_tokens)
-        base_coherence = overlap * 0.2 + self._rng.uniform(0.1, 0.5)
-
-        # Solomonoff-inspired penalty: prefer simpler hypotheses
-        complexity_penalty = math.log(complexity + 1.0)
-
-        return base_coherence - complexity_penalty
