@@ -226,14 +226,24 @@ class Orchestrator:
             for entry in context.working
         ]
 
-        # 4. Generate Being's response via LLM
-        llm_response = self._llm.chat(system_prompt, messages)
+        # 4. Stage-aware LLM parameters – prevent verbose output in early stages
+        stage = self._personality.development.stage
+        age = self._personality.development.cognitive_age
+        max_tokens, temperature = stage_llm_params(stage, age)
+
+        # 5. Generate Being's response via LLM
+        llm_response = self._llm.chat(
+            system_prompt,
+            messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
         being_response = llm_response.content
 
-        # 5. Store Being's response in memory
+        # 6. Store Being's response in memory
         context = self._memory_manager.add_interaction("being", being_response)
 
-        # 6. Optionally extract trait deltas
+        # 7. Optionally extract trait deltas
         trait_deltas = None
         if auto_traits:
             try:
@@ -375,3 +385,35 @@ class Orchestrator:
     def cleanup_archival(self) -> None:
         """Delete the Qdrant collection (for test cleanup)."""
         self._archival.delete_collection()
+
+
+def stage_llm_params(stage: str, cognitive_age: float) -> tuple[int, float]:
+    """Return (max_tokens, temperature) tuned for the developmental stage.
+
+    Early stages use very low token limits to physically prevent the LLM
+    from generating long, fluent text.  Temperature is kept low for early
+    stages to reduce hallucination of complex language.
+
+    Parameters
+    ----------
+    stage : str
+        Current Piaget stage.
+    cognitive_age : float
+        Cognitive age in months.
+
+    Returns
+    -------
+    tuple[int, float]
+        (max_tokens, temperature) for the LLM call.
+    """
+    if stage == "sensorimotor":
+        if cognitive_age < 6.0:
+            return 15, 0.9
+        if cognitive_age < 12.0:
+            return 25, 0.8
+        return 40, 0.7
+    if stage == "preoperational":
+        return 150, 0.7
+    if stage == "concrete_operational":
+        return 512, 0.7
+    return 1024, 0.7

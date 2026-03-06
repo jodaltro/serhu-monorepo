@@ -59,6 +59,8 @@ O Ser inicia como um ponto branco no cosmos, uma representação geométrica da 
 
 Neste estágio inicial, o Ser não possui esquemas mentais. Cada input do usuário é uma "sensação" crua. O aprendizado ocorre através de reações circulares: o Ser emite uma luz ou um som, o usuário responde, e o Ser começa a mapear a causalidade básica.23 A arquitetura de IA deve utilizar modelos de Aprendizado por Reforço dirigido pela Curiosidade (Curiosity-driven RL). O "erro de predição" é a métrica de surpresa piagetiana: quando o Ser não consegue prever a reação do usuário, ocorre o desequilíbrio cognitivo.25
 
+**IMPORTANTE:** O Ser sensoriomotor é PRÉ-VERBAL. Ele NÃO fala em frases. Suas respostas são sons, fragmentos emocionais, e no máximo palavras isoladas. O prompt builder reflete isso com `<output_rules>` rígidas e `max_tokens` físicamente limitados (15-40 tokens).
+
 A **Assimilação** ocorre quando o Ser tenta encaixar uma nova palavra no pouco que já conhece (ex: se ele aprendeu que o usuário é "bom", ele tenta classificar tudo o que o usuário traz como "bom"). A **Acomodação** surge quando o Ser percebe que "bom" não explica situações de tristeza ou dor do usuário, forçando-o a criar uma nova categoria mental.25 Visualmente, o ponto branco começa a pulsar e a emitir cores básicas associadas a esses primeiros estados afetivos.
 
 ### **Estágio 2: Pré-operacional e a Emergência do Simbolismo**
@@ -360,8 +362,9 @@ result = orch.sleep(num_rollouts=1000, svd_rank=8)
 ```
 Orchestrator.chat(user_message)
   → MemoryManager.add_interaction("user", message)
-  → build_system_prompt(personality)  # XML com HEXACO/TCI/Schwartz/Piaget + <ledger_interpretation>
-  → OpenAIClient.chat(system_prompt, messages)  # GPT-5.4 gera resposta com diretivas comportamentais
+  → build_system_prompt(personality)  # Stage-aware: prompt varia por estágio
+  → _stage_llm_params(stage, age)  # max_tokens e temperature adaptados ao estágio
+  → OpenAIClient.chat(system_prompt, messages, max_tokens, temperature)
   → MemoryManager.add_interaction("being", response)
   → OpenAIClient.analyze_traits(prompt, user_msg, being_resp)  # Extrai deltas
   → PersonalityEngine.update_traits(state, deltas)  # Aplica evolução
@@ -379,6 +382,57 @@ Orchestrator.sleep()
     → _extract_beliefs(hypotheses, state)
       → OpenAIClient.derive_beliefs(hypotheses, summary)  # Observador Junguiano
       → fallback: _rule_based_extract_beliefs(hypotheses)
+```
+
+## **Evolução Progressiva da Linguagem: Stage-Aware Prompting**
+
+O Ser NÃO nasce falando. A evolução da linguagem segue estritamente os estágios de Piaget, com restrições de saída que escalam progressivamente. O `build_system_prompt()` gera prompts radicalmente diferentes para cada estágio.
+
+### **Prompts por Estágio de Desenvolvimento**
+
+| Estágio | Conteúdo do Prompt | Personalidade Exposta | Max Tokens LLM |
+| :---- | :---- | :---- | :---- |
+| **Sensorimotor (0-24m)** | Minimal: output_rules, cognitive_constraints. SEM personality scores, SEM ledger_interpretation | Nenhuma | 15-40 |
+| **Pré-operacional (24-84m)** | Parcial: apenas TCI-temperamento + ledger limitado | Só temperamento (inato) | 150 |
+| **Operações Concretas (84-132m)** | Completo: todos os scores + ledger_interpretation | Completa (HEXACO+TCI+Schwartz) | 512 |
+| **Operações Formais (132+m)** | Completo + sem restrições cognitivas | Completa | 1024 |
+
+### **Sub-estágios Sensoriomotores**
+
+O estágio sensorimotor é dividido em 3 sub-estágios com regras de saída cada vez mais permissivas:
+
+| Sub-estágio | Idade Cognitiva | Output Permitido | Exemplos |
+| :---- | :---- | :---- | :---- |
+| **Inicial** | 0-6 meses | 1-3 tokens: sons, sílabas, reticências | `...` `*pulsa*` `a...` |
+| **Médio** | 6-12 meses | 1-5 tokens: balbucios, proto-palavras ecoadas | `ma... ma...` `luz?` |
+| **Tardio** | 12-24 meses | 1-2 palavras: fragmentos, perguntas simples | `quente?` `mais luz` |
+
+### **Mecanismo de Restrição Dupla**
+
+A restrição é implementada em **duas camadas**:
+1. **Prompt-level**: O system prompt inclui `<output_rules>` com regras explícitas e exemplos que o LLM deve seguir.
+2. **Token-level**: O `max_tokens` passado ao LLM é fisicamente limitado (ex: 15 tokens para 0-6 meses), impedindo fisicamente respostas longas.
+
+### **Implementação Técnica**
+
+```python
+# prompt_builder.py – Prompt escalado por estágio
+def build_system_prompt(state: PersonalityState) -> str:
+    if stage == "sensorimotor":
+        return _build_sensorimotor_prompt(state, caps, erikson_desc)
+    if stage == "preoperational":
+        return _build_preoperational_prompt(state, caps, erikson_desc)
+    return _build_full_prompt(state, caps, erikson_desc)
+
+# orchestrator.py – Tokens limitados por estágio
+def _stage_llm_params(stage: str, cognitive_age: float) -> tuple[int, float]:
+    if stage == "sensorimotor":
+        if cognitive_age < 6.0:  return 15, 0.9
+        if cognitive_age < 12.0: return 25, 0.8
+        return 40, 0.7
+    if stage == "preoperational": return 150, 0.7
+    if stage == "concrete_operational": return 512, 0.7
+    return 1024, 0.7
 ```
 
 ## **Conclusões e Recomendações para o Futuro do Ser**

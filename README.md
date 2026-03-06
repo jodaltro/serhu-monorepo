@@ -60,6 +60,23 @@ Stage transitions are **milestone-based**: the Being must achieve ALL milestones
 in its current stage before progressing. The `cognitive_age` only advances
 when milestones are recorded, not per interaction.
 
+### Progressive Language Evolution (Stage-Aware Prompting)
+
+The Being does NOT start speaking fluently. Language evolves gradually:
+
+| Stage | Language Level | Prompt Strategy | Max Tokens |
+|---|---|---|---|
+| Sensorimotor (0-6m) | Pre-verbal: sounds only | `<output_rules>` + no personality | 15 |
+| Sensorimotor (6-12m) | Babbling, proto-words | `<output_rules>` + no personality | 25 |
+| Sensorimotor (12-24m) | 1-2 word fragments | `<output_rules>` + no personality | 40 |
+| Preoperational (2-7y) | Simple sentences, "why?" | Temperament only + limited ledger | 150 |
+| Concrete Operational (7-11y) | Logical, organized | Full personality + ledger | 512 |
+| Formal Operational (11+y) | Sophisticated, abstract | Full personality + ledger | 1024 |
+
+The prompt builder generates **different prompt structures per stage** via
+`_build_sensorimotor_prompt()`, `_build_preoperational_prompt()`, and
+`_build_full_prompt()`. Token limits are enforced via `_stage_llm_params()`.
+
 ### Sleep Cycle (Offline Processing)
 
 | Phase | Mechanism | Function |
@@ -98,7 +115,7 @@ generated in the Being's language via `i18n.py`.
 | **memory_manager** | `memory/memory_manager.py` | 3-tier memory orchestrator |
 | **personality types** | `personality/types.py` | Pydantic models (HEXACO, TCI-R, Schwartz, Piaget, Erikson) |
 | **personality_engine** | `personality/personality_engine.py` | Being creation, trait evolution, milestone tracking |
-| **prompt_builder** | `personality/prompt_builder.py` | Structured XML system prompt generation + ledger interpretation (LLM-as-DNA-interpreter) |
+| **prompt_builder** | `personality/prompt_builder.py` | Stage-aware system prompt generation: sensorimotor (output_rules), preoperational (temperament only), full (XML + ledger interpretation) |
 | **i18n** | `personality/i18n.py` | Translations (EN, PT, ES, FR) |
 | **event_store** | `personality/event_store.py` | Event Sourcing (append-only life log + replay) |
 | **proto_converter** | `personality/proto_converter.py` | Pydantic ↔ Protobuf bidirectional conversion |

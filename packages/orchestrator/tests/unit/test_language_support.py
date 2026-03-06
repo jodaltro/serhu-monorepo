@@ -94,7 +94,7 @@ class TestLanguageSupport:
         state_pt = PersonalityState(being_id="test-pt", language="pt")
         prompt_pt = build_system_prompt(state_pt)
         # Portuguese should have "Reagir" (react) instead of "React"
-        assert "Reagir" in prompt_pt or "simples" in prompt_pt
+        assert "Reagir" in prompt_pt or "simples" in prompt_pt or "primitivas" in prompt_pt
 
         # Test English for comparison
         state_en = PersonalityState(being_id="test-en", language="en")

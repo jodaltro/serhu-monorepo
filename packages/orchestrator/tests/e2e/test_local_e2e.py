@@ -122,7 +122,8 @@ class TestLocalE2ELifecycle:
         assert 'language="pt"' in prompt
         assert "E2E-Being" in prompt
         assert "sensorimotor" in prompt
-        assert "sincerity=" in prompt
+        # Sensorimotor prompt should have output_rules, not personality scores
+        assert "<output_rules>" in prompt
         assert "CONFIANÇA" in prompt or "confiança" in prompt.lower()
 
     def test_build_prompt_english(self, mock_orchestrator_en: Orchestrator):
