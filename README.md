@@ -18,14 +18,14 @@ Synthetic Being Ontogenesis — a MemGPT-like orchestration layer for evolving A
 │              │   Search      │  Semantic Facts              │
 └──────────────┴───────────────┴────────────────────────────┘
          │                │                  │
-   ┌─────┴────┐    ┌──────┴──────┐    ┌─────┴──────┐    ┌────────────┐
-   │Personality│    │  Sleep/Dream│    │Event Store │    │  LLM       │
-   │  Engine   │    │   Engine    │    │(Sourcing)  │    │  Module    │
-   │ HEXACO 24 │    │ Solomonoff  │    │ Protobuf   │    │ GPT-5.4   │
-   │ TCI-R  29 │    │  AIXI + SVD│    │ gRPC       │    │ Protocol  │
-   │Schwartz 19│    │  LLM Dreams│    │ Replay     │    │ DNA Interp│
-   │ Piaget    │    └────────────┘    └────────────┘    └────────────┘
-   │ Erikson   │
+   ┌─────┴────┐    ┌──────┴──────┐    ┌─────┴──────┐
+   │Personality│    │  Sleep/Dream│    │Event Store │
+   │  Engine   │    │   Engine    │    │(Sourcing)  │
+   │ HEXACO 24 │    │ Solomonoff  │    │ Protobuf   │
+   │ TCI-R  29 │    │  AIXI + SVD│    │ gRPC       │
+   │Schwartz 19│    │ NeuralEngine│    │ Replay     │
+   │ Piaget    │    │ Self-Learn  │    └────────────┘
+   │ Erikson   │    └────────────┘
    │ i18n (4)  │
    │ Ledger    │
    │ Interpret │
@@ -77,14 +77,18 @@ The prompt builder generates **different prompt structures per stage** via
 `_build_sensorimotor_prompt()`, `_build_preoperational_prompt()`, and
 `_build_full_prompt()`. Token limits are enforced via `_stage_llm_params()`.
 
-### Sleep Cycle (Offline Processing)
+### Sleep Cycle (Offline Processing — Self-Learning)
+
+The sleep cycle is the Being's primary mechanism for building its own
+internal language model.  No external LLM is required.
 
 | Phase | Mechanism | Function |
 |---|---|---|
-| **Semantization** | LLM Memory Manager (fallback: keyword frequency) | Transform episodic memory → semantic memory (patterns, beliefs, facts) |
-| **Dream (REM)** | LLM Solomonoff Induction + MC-AIXI rollouts | Generate hypotheses via LLM pattern discovery, simulate future conversations |
+| **Training** | NeuralEngine (TF-IDF + self-attention + n-gram mining) | Build internal model from episodic memories (transformer-inspired) |
+| **Semantization** | NeuralEngine pattern analysis (fallback: keyword frequency) | Transform episodic memory → semantic memory (patterns, beliefs, facts) |
+| **Dream (REM)** | NeuralEngine hypothesis generation + MC-AIXI rollouts | Generate hypotheses via self-learned pattern discovery |
 | **Consolidation (NREM)** | SVD rank-reduction | Noise removal from personality vector |
-| **Ledger Update** | LLM Jungian Observer + belief stack + persist | Derive beliefs from dreams, store evolved traits |
+| **Ledger Update** | NeuralEngine belief derivation + belief stack + persist | Derive beliefs from dreams, store evolved traits |
 
 ### Event Sourcing
 
@@ -107,8 +111,9 @@ generated in the Being's language via `i18n.py`.
 | Module | Path | Description |
 |--------|------|-------------|
 | **orchestrator** | `orchestrator.py` | The Brain — top-level lifecycle controller |
-| **llm_client** | `llm/llm_client.py` | LLM protocol interface |
-| **openai_client** | `llm/openai_client.py` | GPT-5.4 implementation (chat, trait analysis, sleep enhancement, dream hypotheses) |
+| **neural_engine** | `sleep/neural_engine.py` | Transformer-inspired self-learning engine (TF-IDF, self-attention, n-gram patterns, response generation) |
+| **llm_client** | `llm/llm_client.py` | LLM protocol interface (deprecated — kept for backward compatibility) |
+| **openai_client** | `llm/openai_client.py` | OpenAI implementation (deprecated — no longer used by Orchestrator) |
 | **working_memory** | `memory/working_memory.py` | In-process FIFO buffer (RAM) |
 | **archival_memory** | `memory/archival_memory.py` | Qdrant vector store (Disk) |
 | **relational_memory** | `memory/relational_memory.py` | Supabase structured store (DB) |
@@ -119,7 +124,7 @@ generated in the Being's language via `i18n.py`.
 | **i18n** | `personality/i18n.py` | Translations (EN, PT, ES, FR) |
 | **event_store** | `personality/event_store.py` | Event Sourcing (append-only life log + replay) |
 | **proto_converter** | `personality/proto_converter.py` | Pydantic ↔ Protobuf bidirectional conversion |
-| **dream_engine** | `sleep/dream_engine.py` | AIXI rollouts (LLM-enhanced Solomonoff Induction + random fallback) + SVD dream pruning |
+| **dream_engine** | `sleep/dream_engine.py` | AIXI rollouts (NeuralEngine-powered hypothesis generation + random fallback) + SVD dream pruning |
 | **sleep_cycle** | `sleep/sleep_cycle.py` | Full sleep orchestration (NREM + REM) |
 
 ## Setup
@@ -146,14 +151,8 @@ Required variables:
 - `SUPABASE_URL` — Supabase project URL
 - `SUPABASE_KEY` — Supabase anon/service key
 
-**LLM Integration (Optional)**
-
-To enable GPT-5.4-powered chat and sleep enhancement:
-
-- `OPENAI_API_KEY` — Your OpenAI API key
-- `OPENAI_MODEL` — Model name (default: `gpt-5.4`)
-
-See [LLM_SETUP.md](./LLM_SETUP.md) for detailed configuration and usage.
+**Note:** External LLM (GPT-5.4) is no longer required. The Being learns
+from its own experiences via the NeuralEngine during sleep cycles.
 
 ### Supabase Table Setup
 
@@ -224,7 +223,7 @@ python -m pytest packages/grpc_server/tests/unit -v
 # Integration tests (requires Qdrant + Supabase credentials in .env)
 python -m pytest packages/orchestrator/tests/integration -v -m integration
 
-# ALL tests (312 Python + 7 JS, no external services)
+# ALL tests (369 Python + 9 JS, no external services)
 python -m pytest packages/orchestrator/tests/unit packages/orchestrator/tests/e2e \
   packages/morphogenesis/tests/unit packages/api/tests/unit \
   packages/grpc_server/tests/unit -v
@@ -265,8 +264,8 @@ REST API built with FastAPI, exposing the Orchestrator's full lifecycle:
 | `/beings` | POST | Create a new Being (tabula rasa) |
 | `/beings/{id}` | GET | Get Being summary |
 | `/beings/{id}/personality` | GET | Full personality ledger (72-dim vector) |
-| `/beings/{id}/chat` | POST | Chat with LLM (requires OPENAI_API_KEY) |
-| `/beings/{id}/process` | POST | Process message without LLM (manual mode) |
+| `/beings/{id}/chat` | POST | Chat with the Being (self-generated responses from learned patterns) |
+| `/beings/{id}/process` | POST | Process message (manual mode, explicit trait deltas) |
 | `/beings/{id}/consolidate` | POST | Consolidate working memory to archival |
 | `/beings/{id}/sleep` | POST | Trigger full sleep cycle (NREM + REM) |
 | `/beings/{id}/recall` | POST | Recall memories via semantic search |

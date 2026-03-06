@@ -103,15 +103,12 @@ def get_personality(being_id: str):
 
 @router.post("/{being_id}/chat", response_model=ChatResponse)
 def chat(being_id: str, body: ChatRequest):
-    """Chat with a Being (requires LLM client)."""
+    """Chat with a Being (self-generated responses from learned patterns)."""
     orch = _get_orch(being_id)
-    try:
-        response_text, _ctx = orch.chat(
-            body.message,
-            auto_traits=body.auto_traits,
-        )
-    except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    response_text, _ctx = orch.chat(
+        body.message,
+        auto_traits=body.auto_traits,
+    )
 
     p = orch.personality
     return ChatResponse(

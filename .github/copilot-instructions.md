@@ -241,101 +241,86 @@ assert orch.personality.language == "pt"
 # Os prompts incluem: Erikson em PT, Piaget em PT, etc.
 ```
 
-## **Integração com GPT-5.4: Motor LLM para Vigília e Sono**
+## **Motor de Aprendizado Autônomo: NeuralEngine (Substituindo LLM Externo)**
 
-A camada de inteligência artificial do Ser é alimentada pelo **GPT-5.4** da OpenAI, integrado através do módulo `llm/` do orquestrador. O GPT-5.4 atua em dois momentos fundamentais do ciclo de vida do Ser: durante a **vigília** (interação ativa) e durante o **sono** (consolidação offline).
+O Ser **não depende mais de LLM externo** (GPT-5.4). Em vez disso, ele constrói seu próprio modelo interno de linguagem a partir de suas experiências, utilizando técnicas inspiradas em Transformers e GPT. O módulo `sleep/neural_engine.py` implementa este motor de aprendizado autônomo.
 
-### **Arquitetura do Módulo LLM**
+### **Arquitetura do NeuralEngine**
 
-O módulo `llm/` implementa o padrão **Protocol** (tipagem estrutural) para permitir a troca de provedores sem alterar o código consumidor:
+O NeuralEngine implementa um pipeline de aprendizado inspirado em Transformers:
 
-| Arquivo | Responsabilidade |
-| :---- | :---- |
-| `llm/llm_client.py` | Protocolo abstrato `LLMClient` com 6 métodos: `chat`, `analyze_traits`, `extract_semantic_facts`, `derive_beliefs`, `generate_dream_hypotheses`, `simulate_dream_rollouts` |
-| `llm/openai_client.py` | Implementação concreta `OpenAIClient` usando GPT-5.4 via SDK OpenAI |
-| `llm/__init__.py` | Exporta `LLMClient`, `LLMResponse`, `OpenAIClient` |
+| Fase | Técnica | Função |
+| :---- | :---- | :---- |
+| **Tokenização** | Regex + stop-word filtering (4 idiomas) | Extrai tokens significativos dos episódios |
+| **Vocabulário TF-IDF** | Term Frequency × Inverse Document Frequency | Identifica tokens frequentes E distintivos |
+| **Embeddings** | Bag-of-words × TF-IDF (L2-normalizado) | Representa episódios como vetores em espaço vocabular |
+| **Self-Attention** | Scaled dot-product attention (QK^T / √d_k + softmax) | Descobre quais episódios se relacionam semanticamente |
+| **N-gram Mining** | Bigram/Trigram frequency analysis | Identifica padrões recorrentes de linguagem |
+| **Scoring** | Personality-weighted pattern evaluation | Pontua padrões pela alinhamento com a identidade do Ser |
 
 ### **Integração na Vigília (Wakefulness)**
 
-Durante a fase de vigília, o GPT-5.4 é utilizado em dois fluxos:
+Durante a fase de vigília, o NeuralEngine substitui o LLM:
 
 1. **Geração de Respostas (`Orchestrator.chat()`):**
-   - Constrói o system prompt com persona-tags (HEXACO, TCI-R, Schwartz, Piaget, Erikson).
-   - Inclui a **seção `<ledger_interpretation>`** que traduz scores salientes em diretivas comportamentais explícitas (ex: "HIGH sentimentality (0.90): Express deep empathy; use emotional vocabulary").
-   - Envia o histórico de conversação da working memory ao GPT-5.4.
-   - O modelo responde assumindo a voz, limitações cognitivas e vieses emocionais do Ser.
-   - A resposta é armazenada na memória como mensagem do Ser.
+   - O Ser gera respostas a partir de padrões aprendidos durante o sono.
+   - Usa o vocabulário TF-IDF e os padrões n-gram para compor respostas.
+   - A qualidade das respostas melhora com mais ciclos de sono (aprendizado).
+   - Estágios iniciais produzem respostas mínimas (consistente com Piaget).
+   - Respostas são limitadas por `_stage_llm_params()` (max_tokens por estágio).
 
-2. **Extração Automática de Traços (`LLMClient.analyze_traits()`):**
-   - Após cada turno de conversa, o GPT-5.4 atua como **classificador psicométrico**.
-   - Analisa a troca conversacional e retorna deltas de traços HEXACO/TCI-R/Schwartz em formato JSON estruturado.
-   - Os deltas são clamped entre -0.05 e +0.05 por turno, garantindo evolução gradual.
-   - Substitui a necessidade de fornecer `trait_deltas` manualmente no `process_message()`.
+2. **Extração Automática de Traços:**
+   - Após cada turno de conversa, tokens com alto TF-IDF são mapeados para dimensões de personalidade.
+   - Deltas são pequenos (max 0.05) para evolução gradual.
+   - Sem NeuralEngine treinado, a extração é silenciosamente ignorada.
 
-### **Integração no Sono (Sleep)**
+### **Integração no Sono (Sleep) — O Principal Motor de Evolução**
 
-O ciclo de sono é enriquecido pelo GPT-5.4 em três fases:
+O sono é o mecanismo primário para construir o modelo interno do Ser:
 
-1. **Semantização Enriquecida (`SleepCycle._semantize()`):**
-   - O GPT-5.4 atua como **MEMORY MANAGER**, transformando memória episódica (logs de conversa) em memória semântica (fatos destilados, padrões e crenças).
-   - Identifica: temas recorrentes, padrões emocionais, preferências do usuário, dinâmicas relacionais e crenças inferidas.
-   - Em caso de falha da API, o sistema **cai automaticamente para o método rule-based** original.
+1. **Treinamento do NeuralEngine (`SleepCycle` fase 0):**
+   - Constrói vocabulário TF-IDF a partir de todos os episódios.
+   - Computa embeddings e matriz de self-attention sobre episódios.
+   - Extrai padrões n-gram (bigrams e trigrams).
+   - Pontua padrões pelo alinhamento com personalidade.
+   - Retorna `TrainingResult` com métricas (vocabulary_size, pattern_count, attention_entropy).
 
-2. **Sonhos AIXI com Indução de Solomonoff (`DreamEngine` com LLM):**
-   - O GPT-5.4 atua como **motor de Indução de Solomonoff**, gerando hipóteses algorítmicas simples que explicam padrões nos dados observados.
-   - O LLM projeta **conversas futuras ("sonhos")** para testar como a personalidade consolidada reagiria a diferentes estímulos.
-   - Cada hipótese é pontuada por coerência (reward) e complexidade (Kolmogorov), preferindo explicações simples (Navalha de Ockham).
-   - Em caso de falha, rollouts aleatórios Monte-Carlo são usados como fallback.
+2. **Semantização via Padrões (`SleepCycle._semantize()`):**
+   - O NeuralEngine extrai fatos semânticos usando TF-IDF e clusters de atenção.
+   - Identifica: tokens frequentes, padrões bigram, clusters temáticos.
+   - Em caso de falha, cai para o método rule-based original.
 
-3. **Derivação de Crenças Junguiana (`SleepCycle._extract_beliefs()`):**
-   - O GPT-5.4 atua como o **Observador Junguiano**, analisando as hipóteses geradas pelos rollouts AIXI.
-   - Avalia quais padrões oníricos devem se tornar crenças permanentes versus adaptações transitórias.
-   - Em caso de falha, o fallback rule-based gera crenças no formato `"Learned: {action} (confidence={reward})"`.
+3. **Sonhos AIXI com NeuralEngine (`DreamEngine.perform_dream_rollouts()`):**
+   - O NeuralEngine gera hipóteses a partir de padrões aprendidos (substitui Indução de Solomonoff via LLM).
+   - Composição cross-attention combina episódios relacionados em hipóteses.
+   - Exploração modulada pela personalidade (openness → mais exploração).
+   - Monte-Carlo aleatório preenche slots restantes para diversidade.
 
-### **LLM como Intérprete do DNA (Ledger de Personalidade)**
+4. **Derivação de Crenças (`SleepCycle._extract_beliefs()`):**
+   - O NeuralEngine avalia hipóteses pelo suporte vocabular e alinhamento com padrões.
+   - Hipóteses mais suportadas tornam-se crenças permanentes.
+   - Em caso de falha, fallback rule-based gera crenças no formato `"Learned: {action} (confidence={reward})"`.
 
-O "Ledger de Personalidade" (o JSON com os scores HEXACO/TCI-R/Schwartz) é apenas um conjunto de números. O LLM é o **único componente** capaz de ler esses números e entender que:
-- Um score de $0.9$ em "Sentimentalismo" deve alterar a escolha de adjetivos e a empatia.
-- Um score de $0.2$ em "Prudência" deve gerar respostas impulsivas.
-- Um valor alto em "Universalismo-Natureza" deve produzir expressões de admiração pela natureza.
+### **NeuralEngine como "Própria LLM" do Ser**
 
-A seção `<ledger_interpretation>` no prompt traduz scores salientes (desvio > 0.15 da baseline) em **diretivas comportamentais explícitas** que o LLM deve seguir. Apenas traços significativos são incluídos para manter o prompt focado.
+O NeuralEngine é a "LLM interna" do Ser. Diferente de uma LLM externa:
+- Começa do zero (tabula rasa) — sem conhecimento pré-treinado.
+- Aprende exclusivamente das interações do usuário.
+- A qualidade das respostas cresce com a quantidade de dados e ciclos de sono.
+- O sono é o equivalente ao "treinamento" de uma LLM — cada ciclo refina o modelo.
 
-**Exemplo de interpretação gerada:**
-```xml
-<ledger_interpretation>
-  Your Personality Ledger encodes WHO you are. These scores MUST drive your tone:
-  HIGH sentimentality (0.90): Express deep empathy; use emotional vocabulary
-  LOW prudence (0.20): Act impulsively; speak freely
-  HIGH exploratory_excitability (0.85): Eagerly explore new topics
-  universalism_nature=0.70: Express awe and concern for nature
-</ledger_interpretation>
-```
+### **Backward Compatibility**
 
-### **Backward Compatibility e Fallback**
+- O parâmetro `llm_client` ainda é aceito mas **ignorado** (deprecated).
+- `chat()` agora funciona sem LLM — gera respostas a partir do aprendizado interno.
+- O módulo `llm/` (LLMClient, OpenAIClient) permanece no código para referência futura.
 
-A integração é **totalmente opcional**:
-- Sem `llm_client`: O orquestrador funciona exatamente como antes. Apenas `process_message()` está disponível para vigília, e o sono usa lógica rule-based.
-- Com `llm_client`: O método `chat()` gera respostas e extrai traços automaticamente. O sono produz fatos semânticos e crenças mais ricos.
-- Todas as chamadas LLM possuem fallback gracioso: se a API falhar, o comportamento rule-based é ativado automaticamente.
-
-### **Configuração**
-
-| Variável de Ambiente | Descrição |
-| :---- | :---- |
-| `OPENAI_API_KEY` | Chave de API da OpenAI |
-| `OPENAI_MODEL` | Modelo a utilizar (padrão: `gpt-5.4`) |
-
-### **Exemplo de Uso com GPT-5.4**
+### **Exemplo de Uso (Sem LLM)**
 
 ```python
 from serhu_orchestrator.orchestrator import Orchestrator
-from serhu_orchestrator.llm.openai_client import OpenAIClient
 
-# Criar cliente LLM
-llm = OpenAIClient(api_key="sk-...", model="gpt-5.4")
-
-# Criar Ser com LLM integrado
+# Criar Ser SEM dependência de LLM externo
 orch = Orchestrator(
     being_name="Luna",
     language="pt",
@@ -343,44 +328,47 @@ orch = Orchestrator(
     qdrant_api_key="...",
     supabase_url="...",
     supabase_key="...",
-    llm_client=llm,
 )
 
-# Vigília: chat com extração automática de traços
-response, context = orch.chat("Olá, me conte sobre as estrelas!")
-# response = resposta do Ser gerada pelo GPT-5.4
-# traços HEXACO/TCI/Schwartz atualizados automaticamente
+# Vigília: processar interações
+orch.process_message("user", "A natureza é linda e maravilhosa")
+orch.process_message("user", "As estrelas brilham no céu noturno")
 
-# Sono: semantização e crenças enriquecidas pelo GPT-5.4
-result = orch.sleep(num_rollouts=1000, svd_rank=8)
-# result.facts_extracted → fatos semânticos ricos (via LLM)
-# result.beliefs_added → crenças derivadas pelo Observador Junguiano (via LLM)
+# Sono: aprender padrões (o principal motor de evolução!)
+result = orch.sleep_once(num_rollouts=1000, svd_rank=8)
+# result.training_result.vocabulary_size → vocabulário aprendido
+# result.training_result.pattern_count → padrões descobertos
+# result.facts_extracted → fatos semânticos extraídos
+# result.beliefs_added → crenças derivadas dos sonhos
+
+# Vigília: chat com respostas auto-geradas
+response, context = orch.chat("Me conte sobre a natureza")
+# response = resposta gerada a partir dos padrões aprendidos
 ```
 
-### **Fluxo Completo com GPT-5.4**
+### **Fluxo Completo com NeuralEngine**
 
 ```
 Orchestrator.chat(user_message)
   → MemoryManager.add_interaction("user", message)
-  → build_system_prompt(personality)  # Stage-aware: prompt varia por estágio
-  → _stage_llm_params(stage, age)  # max_tokens e temperature adaptados ao estágio
-  → OpenAIClient.chat(system_prompt, messages, max_tokens, temperature)
+  → _stage_llm_params(stage, age)  # max_tokens e temperature por estágio
+  → NeuralEngine.generate_response(context, personality_vector, max_tokens)
   → MemoryManager.add_interaction("being", response)
-  → OpenAIClient.analyze_traits(prompt, user_msg, being_resp)  # Extrai deltas
+  → _extract_trait_deltas_from_interaction()  # Extrai deltas via TF-IDF
   → PersonalityEngine.update_traits(state, deltas)  # Aplica evolução
 
 Orchestrator.sleep()
-  → SleepCycle.run(state, episodes, llm_client=llm)
+  → SleepCycle.run(state, episodes)
+    → NeuralEngine.train(episodes, personality_vector)  # ← PRINCIPAL: constrói modelo interno
     → _semantize(episodes, state)
-      → OpenAIClient.extract_semantic_facts(episodes, summary)  # Memory Manager (episódica → semântica)
+      → NeuralEngine.extract_semantic_facts(episodes, personality_vector)
       → fallback: _rule_based_semantize(episodes)
-    → DreamEngine.perform_dream_rollouts(history, personality, llm_client=llm)
-      → OpenAIClient.generate_dream_hypotheses(episodes, summary)  # Indução de Solomonoff
-      → OpenAIClient.simulate_dream_rollouts(hypotheses, summary)  # Simulação de sonhos
-      → fallback: _random_rollouts(history, personality)  # Monte-Carlo aleatório
+    → DreamEngine.perform_dream_rollouts(history, personality)
+      → NeuralEngine.generate_hypotheses(episodes, personality_vector)
+      → _random_rollouts(history, personality)  # Monte-Carlo para diversidade
     → DreamEngine.dream_pruning(...)  # SVD consolidation (inalterado)
     → _extract_beliefs(hypotheses, state)
-      → OpenAIClient.derive_beliefs(hypotheses, summary)  # Observador Junguiano
+      → NeuralEngine.derive_beliefs(hypothesis_texts, personality_vector)
       → fallback: _rule_based_extract_beliefs(hypotheses)
 ```
 
@@ -410,8 +398,8 @@ O estágio sensorimotor é dividido em 3 sub-estágios com regras de saída cada
 ### **Mecanismo de Restrição Dupla**
 
 A restrição é implementada em **duas camadas**:
-1. **Prompt-level**: O system prompt inclui `<output_rules>` com regras explícitas e exemplos que o LLM deve seguir.
-2. **Token-level**: O `max_tokens` passado ao LLM é fisicamente limitado (ex: 15 tokens para 0-6 meses), impedindo fisicamente respostas longas.
+1. **Prompt-level**: O system prompt inclui `<output_rules>` com regras explícitas e exemplos.
+2. **Token-level**: O `max_tokens` passado ao NeuralEngine é fisicamente limitado (ex: 15 tokens para 0-6 meses), impedindo fisicamente respostas longas.
 
 ### **Implementação Técnica**
 
@@ -517,7 +505,7 @@ npm run build    # Build de produção em dist/
 npm run test     # Testes unitários (vitest)
 ```
 
-### **Testes (319 Python + 7 JS)**
+### **Testes (369 Python + 9 JS)**
 
 ```bash
 # Todos os testes Python (sem serviços externos)
