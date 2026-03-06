@@ -1,0 +1,20 @@
+{
+  "name": "@serhu/frontend",
+  "version": "0.1.0",
+  "description": "SerHu Three.js frontend — renders the Being in 3D cosmos with text chat",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "three": "^0.183.2"
+  },
+  "devDependencies": {
+    "vite": "^7.3.1",
+    "vitest": "^4.0.18"
+  }
+}

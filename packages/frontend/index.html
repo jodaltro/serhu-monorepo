@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SerHu — Synthetic Being</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <!-- Three.js canvas fills the viewport -->
+  <div id="canvas-container"></div>
+
+  <!-- Chat overlay -->
+  <div id="chat-panel">
+    <div id="chat-header">
+      <span id="being-name">SerHu</span>
+      <span id="being-stage" class="badge">sensorimotor</span>
+    </div>
+    <div id="chat-messages"></div>
+    <form id="chat-form">
+      <input
+        id="chat-input"
+        type="text"
+        placeholder="Speak to the Being…"
+        autocomplete="off"
+      />
+      <button type="submit">↵</button>
+    </form>
+  </div>
+
+  <!-- Setup overlay (shown on first load) -->
+  <div id="setup-overlay">
+    <div id="setup-card">
+      <h1>Create your Being</h1>
+      <form id="setup-form">
+        <label for="being-name-input">Name</label>
+        <input id="being-name-input" type="text" placeholder="Luna" required />
+        <label for="language-select">Language</label>
+        <select id="language-select">
+          <option value="en">English</option>
+          <option value="pt">Português</option>
+          <option value="es">Español</option>
+          <option value="fr">Français</option>
+        </select>
+        <button type="submit">Give birth ✦</button>
+      </form>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

@@ -224,10 +224,11 @@ python -m pytest packages/grpc_server/tests/unit -v
 # Integration tests (requires Qdrant + Supabase credentials in .env)
 python -m pytest packages/orchestrator/tests/integration -v -m integration
 
-# ALL tests (328 tests, no external services)
+# ALL tests (312 Python + 7 JS, no external services)
 python -m pytest packages/orchestrator/tests/unit packages/orchestrator/tests/e2e \
   packages/morphogenesis/tests/unit packages/api/tests/unit \
   packages/grpc_server/tests/unit -v
+cd packages/frontend && npm test
 ```
 
 ### Test Categories
@@ -239,6 +240,7 @@ python -m pytest packages/orchestrator/tests/unit packages/orchestrator/tests/e2
 | **Morphogenesis Unit** | `packages/morphogenesis/tests/unit/` | None | 26 | Color, geometry, animation engines |
 | **API Unit** | `packages/api/tests/unit/` | None (in-memory mocks) | 16 | REST endpoints, CRUD, visual state |
 | **gRPC Unit** | `packages/grpc_server/tests/unit/` | None | 16 | Servicer + in-process channel |
+| **Frontend Unit** | `packages/frontend/tests/unit/` | None | 7 | API client (createBeing, chat, visual) |
 | **Integration** | `packages/orchestrator/tests/integration/` | Qdrant + Supabase | — | Real backend connectivity |
 
 ## Packages
@@ -249,6 +251,7 @@ python -m pytest packages/orchestrator/tests/unit packages/orchestrator/tests/e2
 | `packages/api` | FastAPI REST API — exposes the Orchestrator to mobile/web clients |
 | `packages/morphogenesis` | Visual Morphogenesis Engine — personality → color/shape/animation |
 | `packages/grpc_server` | gRPC BeingService — Lambda ↔ Fargate binary communication |
+| `packages/frontend` | Three.js web frontend — renders the Being in 3D cosmos with text chat |
 
 ## Application Modules
 
@@ -307,4 +310,32 @@ for high-performance binary communication between services:
 # Run the gRPC server
 cd packages/grpc_server && pip install -e ".[dev]"
 python -m serhu_grpc.server --port 50051
+```
+
+### Frontend (`packages/frontend`)
+
+Three.js web application that renders the Being as a 3D entity in a cosmic
+starfield. The user interacts via text chat; the Being responds both verbally
+and physically — its shape, color, and movement evolve in real-time as its
+personality develops.
+
+**Stack:** Vite + Three.js (vanilla ES modules)
+
+**Morphogenesis 3D Pipeline:**
+- `IcosahedronGeometry` (detail=4) base mesh with vertex displacement
+- Kiki/Bouba deformation: `roundness` → spherical, `spikiness` → angular
+- `MeshPhysicalMaterial` with emissive glow, clearcoat, PBR roughness
+- Pulse breathing, Lissajous drift, rotation driven by temperament
+- HSL color from personality (hue=trait, saturation=arousal, lightness=valence)
+
+```bash
+# Run the frontend dev server (proxies API calls to :8000)
+cd packages/frontend && npm install
+npm run dev      # → http://localhost:3000
+
+# Build for production
+npm run build
+
+# Run tests
+npm test
 ```
