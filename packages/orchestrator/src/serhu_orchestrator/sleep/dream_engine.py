@@ -234,7 +234,7 @@ class DreamEngine:
         for i in range(num_rollouts):
             obs = env.reset()
             # Vary the seed per rollout for diversity
-            env._rng = random.Random((self._seed or 0) + i)
+            env.reseed((self._seed or 0) + i)
 
             total_reward = 0.0
             action_trace: list[str] = []

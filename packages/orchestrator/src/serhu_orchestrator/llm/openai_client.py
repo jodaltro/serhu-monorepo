@@ -327,8 +327,6 @@ class OpenAIClient:
         raw = response.choices[0].message.content or "[]"
         return self._parse_rollout_results(raw)
 
-    # -- internal helpers ---------------------------------------------------
-
     # -- LLMClient.extract_environment_spec ---------------------------------
 
     def extract_environment_spec(

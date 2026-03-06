@@ -187,6 +187,10 @@ class AixiEnvironment:
     def current_observation(self) -> str:
         return self._current_obs
 
+    def reseed(self, seed: int) -> None:
+        """Reset the random number generator with a new seed."""
+        self._rng = random.Random(seed)
+
 
 class EnvironmentBuilder:
     """Builds ``EnvironmentSpec`` from LLM analysis or NeuralEngine patterns.
@@ -331,7 +335,7 @@ class EnvironmentBuilder:
         topic_tokens: set[str] = set()
         for ep in episodes[-20:]:
             content = ep.get("content", "")
-            for t in neural.tokenize(content) if neural.is_trained else []:
+            for t in (neural.tokenize(content) if neural.is_trained else []):
                 if len(t) > 3:
                     topic_tokens.add(t)
 
