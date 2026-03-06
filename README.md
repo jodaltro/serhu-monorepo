@@ -18,15 +18,17 @@ Synthetic Being Ontogenesis — a MemGPT-like orchestration layer for evolving A
 │              │   Search      │  Semantic Facts              │
 └──────────────┴───────────────┴────────────────────────────┘
          │                │                  │
-   ┌─────┴────┐    ┌──────┴──────┐    ┌─────┴──────┐
-   │Personality│    │  Sleep/Dream│    │Event Store │
-   │  Engine   │    │   Engine    │    │(Sourcing)  │
-   │ HEXACO 24 │    │  AIXI + SVD│    │ Protobuf   │
-   │ TCI-R  29 │    │  NREM + REM│    │ gRPC       │
-   │Schwartz 19│    │  Beliefs   │    │ Replay     │
-   │ Piaget    │    └────────────┘    └────────────┘
+   ┌─────┴────┐    ┌──────┴──────┐    ┌─────┴──────┐    ┌────────────┐
+   │Personality│    │  Sleep/Dream│    │Event Store │    │  LLM       │
+   │  Engine   │    │   Engine    │    │(Sourcing)  │    │  Module    │
+   │ HEXACO 24 │    │ Solomonoff  │    │ Protobuf   │    │ GPT-5.4   │
+   │ TCI-R  29 │    │  AIXI + SVD│    │ gRPC       │    │ Protocol  │
+   │Schwartz 19│    │  LLM Dreams│    │ Replay     │    │ DNA Interp│
+   │ Piaget    │    └────────────┘    └────────────┘    └────────────┘
    │ Erikson   │
    │ i18n (4)  │
+   │ Ledger    │
+   │ Interpret │
    └───────────┘
 ```
 
@@ -62,10 +64,10 @@ when milestones are recorded, not per interaction.
 
 | Phase | Mechanism | Function |
 |---|---|---|
-| **Semantization** | Keyword frequency | Extract semantic facts from episodes |
-| **Dream (REM)** | MC-AIXI-CTW rollouts | Generate hypotheses about future interactions |
+| **Semantization** | LLM Memory Manager (fallback: keyword frequency) | Transform episodic memory → semantic memory (patterns, beliefs, facts) |
+| **Dream (REM)** | LLM Solomonoff Induction + MC-AIXI rollouts | Generate hypotheses via LLM pattern discovery, simulate future conversations |
 | **Consolidation (NREM)** | SVD rank-reduction | Noise removal from personality vector |
-| **Ledger Update** | Belief stack + persist | Store new beliefs and evolved traits |
+| **Ledger Update** | LLM Jungian Observer + belief stack + persist | Derive beliefs from dreams, store evolved traits |
 
 ### Event Sourcing
 
@@ -89,18 +91,18 @@ generated in the Being's language via `i18n.py`.
 |--------|------|-------------|
 | **orchestrator** | `orchestrator.py` | The Brain — top-level lifecycle controller |
 | **llm_client** | `llm/llm_client.py` | LLM protocol interface |
-| **openai_client** | `llm/openai_client.py` | GPT-5.4 implementation (chat, trait analysis, sleep enhancement) |
+| **openai_client** | `llm/openai_client.py` | GPT-5.4 implementation (chat, trait analysis, sleep enhancement, dream hypotheses) |
 | **working_memory** | `memory/working_memory.py` | In-process FIFO buffer (RAM) |
 | **archival_memory** | `memory/archival_memory.py` | Qdrant vector store (Disk) |
 | **relational_memory** | `memory/relational_memory.py` | Supabase structured store (DB) |
 | **memory_manager** | `memory/memory_manager.py` | 3-tier memory orchestrator |
 | **personality types** | `personality/types.py` | Pydantic models (HEXACO, TCI-R, Schwartz, Piaget, Erikson) |
 | **personality_engine** | `personality/personality_engine.py` | Being creation, trait evolution, milestone tracking |
-| **prompt_builder** | `personality/prompt_builder.py` | Structured XML system prompt generation |
+| **prompt_builder** | `personality/prompt_builder.py` | Structured XML system prompt generation + ledger interpretation (LLM-as-DNA-interpreter) |
 | **i18n** | `personality/i18n.py` | Translations (EN, PT, ES, FR) |
 | **event_store** | `personality/event_store.py` | Event Sourcing (append-only life log + replay) |
 | **proto_converter** | `personality/proto_converter.py` | Pydantic ↔ Protobuf bidirectional conversion |
-| **dream_engine** | `sleep/dream_engine.py` | AIXI rollouts + SVD dream pruning |
+| **dream_engine** | `sleep/dream_engine.py` | AIXI rollouts (LLM-enhanced Solomonoff Induction + random fallback) + SVD dream pruning |
 | **sleep_cycle** | `sleep/sleep_cycle.py` | Full sleep orchestration (NREM + REM) |
 
 ## Setup
