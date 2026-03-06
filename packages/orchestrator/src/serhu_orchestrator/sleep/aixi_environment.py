@@ -176,6 +176,11 @@ class AixiEnvironment:
     _CURIOSITY_INDEX = 24
     _CONSCIENTIOUSNESS_INDEX = 16
 
+    _EXPLORATION_KEYWORDS = frozenset({
+        "explore", "novel", "new", "discover", "ask", "curious",
+    })
+    _INTRINSIC_REWARD_MAGNITUDE = 0.3
+
     def __init__(
         self,
         spec: EnvironmentSpec,
@@ -210,7 +215,10 @@ class AixiEnvironment:
         Returns
         -------
         tuple[str, float, bool, dict]
-            ``(observation, reward, done, info)``
+            ``(observation, reward, done, info)`` where *reward* is
+            ``r_total = r_ext + alpha * r_int``.  The ``info`` dict
+            contains the decomposed components ``r_ext``, ``r_int``
+            and ``r_total``.
         """
         self._step_count += 1
 
@@ -218,8 +226,8 @@ class AixiEnvironment:
         observation = self._transition(action)
         self._current_obs = observation
 
-        # Reward: compute from signals + personality modulation
-        reward = self._compute_reward(action, observation)
+        # Reward: decomposed into extrinsic + intrinsic
+        r_ext, r_int, r_total = self._compute_reward(action, observation)
 
         # Done: when horizon reached
         done = self._step_count >= self.spec.horizon
@@ -228,8 +236,11 @@ class AixiEnvironment:
             "step": self._step_count,
             "action": action,
             "observation": observation,
+            "r_ext": r_ext,
+            "r_int": r_int,
+            "r_total": r_total,
         }
-        return observation, reward, done, info
+        return observation, r_total, done, info
 
     def _transition(self, action: str) -> str:
         """Determine next observation from the WorldModel."""
@@ -243,16 +254,34 @@ class AixiEnvironment:
             return self._rng.choice(self.spec.observations)
         return f"obs_{self._step_count}"
 
-    def _compute_reward(self, action: str, observation: str) -> float:
-        """Compute reward from signals and personality modulation."""
-        base = 0.0
+    def _compute_reward(self, action: str, observation: str) -> tuple[float, float, float]:
+        """Compute decomposed reward: extrinsic, intrinsic, and total.
+
+        Returns ``(r_ext, r_int, r_total)`` where:
+
+        * **r_ext** – objective task reward from ``spec.reward_signals``.
+        * **r_int** – curiosity/novelty bonus for exploration keywords
+          (fixed magnitude, personality-independent).
+        * **r_total** = ``r_ext + alpha * r_int`` where *alpha* is
+          derived from the Being's openness and curiosity traits.
+
+        Personality influences **how much** intrinsic reward matters
+        (via *alpha*) but never changes *what* is rewarded.
+        """
         combined = f"{action} {observation}".lower()
 
+        # --- Extrinsic: objective task reward from reward signals ----------
+        r_ext = 0.0
         for pattern, r in self.spec.reward_signals.items():
             if pattern.lower() in combined:
-                base += r
+                r_ext += r
 
-        # Personality modulation
+        # --- Intrinsic: curiosity / novelty bonus (fixed) -----------------
+        r_int = 0.0
+        if any(kw in combined for kw in self._EXPLORATION_KEYWORDS):
+            r_int = self._INTRINSIC_REWARD_MAGNITUDE
+
+        # --- Alpha: personality-derived weight for intrinsic reward --------
         openness = (
             self._personality[self._OPENNESS_INDEX]
             if len(self._personality) > self._OPENNESS_INDEX
@@ -263,13 +292,10 @@ class AixiEnvironment:
             if len(self._personality) > self._CURIOSITY_INDEX
             else 0.5
         )
+        alpha = (openness + curiosity) / 2.0
 
-        # Exploration actions rewarded more for curious/open Beings
-        explore_keywords = {"explore", "novel", "new", "discover", "ask", "curious"}
-        if any(kw in combined for kw in explore_keywords):
-            base += (openness + curiosity) * 0.15
-
-        return base
+        r_total = r_ext + alpha * r_int
+        return r_ext, r_int, r_total
 
     @property
     def current_observation(self) -> str:
@@ -481,29 +507,18 @@ class EnvironmentBuilder:
     def _derive_rewards(
         neural: NeuralEngine, personality_vector: list[float]
     ) -> dict[str, float]:
-        """Derive reward signals from personality and patterns."""
-        openness = (
-            personality_vector[20]
-            if len(personality_vector) > 20
-            else 0.5
-        )
-        conscientiousness = (
-            personality_vector[16]
-            if len(personality_vector) > 16
-            else 0.5
-        )
-        curiosity = (
-            personality_vector[24]
-            if len(personality_vector) > 24
-            else 0.5
-        )
+        """Derive objective reward signals (personality-independent).
 
+        Personality no longer modulates reward magnitudes here.
+        Instead, personality influences the *intrinsic* reward weight
+        (alpha) inside ``AixiEnvironment._compute_reward()``.
+        """
         rewards: dict[str, float] = {
             # Base rewards for fundamental interactions
             "respond_empathically": 0.3,
-            "ask_question": 0.2 + curiosity * 0.2,
-            "explore": 0.1 + openness * 0.3,
-            "reflect": 0.2 + conscientiousness * 0.1,
+            "ask_question": 0.3,
+            "explore": 0.25,
+            "reflect": 0.25,
             "reinforce_pattern": 0.15,
             # Observation-based rewards
             "user_engaged": 0.3,
