@@ -231,7 +231,8 @@ class TestLedgerInterpretation:
         state = self._make_state()
         state.schwartz.stimulation = 0.1  # Below 0.3 threshold
         prompt = build_system_prompt(state)
-        assert "stimulation=0.10" not in prompt or "Seek novelty" not in prompt
+        # The interpretation section should NOT contain the directive for stimulation
+        assert "Seek novelty" not in prompt
 
     def test_tci_character_shown_when_developed(self):
         state = self._make_state()

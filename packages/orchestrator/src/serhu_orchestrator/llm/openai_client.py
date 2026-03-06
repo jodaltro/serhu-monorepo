@@ -311,12 +311,28 @@ class OpenAIClient:
     # -- internal helpers ---------------------------------------------------
 
     @staticmethod
+    def _strip_code_fence(raw: str) -> str:
+        """Remove markdown code fences from LLM output."""
+        import re
+        cleaned = raw.strip()
+        # Handle ```json\n...\n``` and ```\n...\n``` and ```json[...]```
+        match = re.match(r"^```(?:json)?\s*\n?(.*?)```\s*$", cleaned, re.DOTALL)
+        if match:
+            return match.group(1).strip()
+        return cleaned
+
+    @staticmethod
+    def _clamp_score(
+        value: float, min_val: float = 0.0, max_val: float = 1.0
+    ) -> float:
+        """Clamp a numeric score to the given bounds."""
+        return max(min_val, min(max_val, float(value)))
+
+    @staticmethod
     def _parse_trait_deltas(raw: str) -> dict[str, dict[str, float]]:
         """Parse trait deltas from LLM JSON output with graceful fallback."""
         try:
-            cleaned = raw.strip()
-            if cleaned.startswith("```"):
-                cleaned = cleaned.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+            cleaned = OpenAIClient._strip_code_fence(raw)
             data = json.loads(cleaned)
             if not isinstance(data, dict):
                 return {}
@@ -328,7 +344,9 @@ class OpenAIClient:
                 parsed_traits: dict[str, float] = {}
                 for trait_name, value in traits.items():
                     if isinstance(value, (int, float)):
-                        clamped = max(-0.05, min(0.05, float(value)))
+                        clamped = OpenAIClient._clamp_score(
+                            value, min_val=-0.05, max_val=0.05
+                        )
                         parsed_traits[trait_name] = clamped
                 if parsed_traits:
                     result[model_key] = parsed_traits
@@ -341,9 +359,7 @@ class OpenAIClient:
     def _parse_string_list(raw: str) -> list[str]:
         """Parse a JSON string list from LLM output with graceful fallback."""
         try:
-            cleaned = raw.strip()
-            if cleaned.startswith("```"):
-                cleaned = cleaned.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+            cleaned = OpenAIClient._strip_code_fence(raw)
             data = json.loads(cleaned)
             if isinstance(data, list):
                 return [str(item) for item in data if item]
@@ -356,9 +372,7 @@ class OpenAIClient:
     def _parse_rollout_results(raw: str) -> list[dict]:
         """Parse dream rollout results from LLM JSON output."""
         try:
-            cleaned = raw.strip()
-            if cleaned.startswith("```"):
-                cleaned = cleaned.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+            cleaned = OpenAIClient._strip_code_fence(raw)
             data = json.loads(cleaned)
             if not isinstance(data, list):
                 return []
@@ -367,10 +381,12 @@ class OpenAIClient:
                 if not isinstance(item, dict):
                     continue
                 action = str(item.get("action", ""))
-                reward = float(item.get("reward", 0.0))
-                complexity = float(item.get("complexity", 0.0))
-                reward = max(0.0, min(1.0, reward))
-                complexity = max(0.0, min(1.0, complexity))
+                reward = OpenAIClient._clamp_score(
+                    float(item.get("reward", 0.0))
+                )
+                complexity = OpenAIClient._clamp_score(
+                    float(item.get("complexity", 0.0))
+                )
                 if action:
                     results.append({
                         "action": action,

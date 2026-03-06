@@ -56,6 +56,9 @@ ERIKSON_DESCRIPTIONS = i18n_ERIKSON_DESCRIPTIONS.get("en", {})
 # ---------------------------------------------------------------------------
 
 _SALIENCE_THRESHOLD = 0.15
+# Zero-baseline models (TCI-Character, Schwartz) use a higher threshold
+# because they start at 0.0 and must develop before becoming salient.
+_ZERO_BASELINE_THRESHOLD = 0.3
 
 _FACET_DIRECTIVES: dict[str, tuple[str, str]] = {
     # HEXACO – Honesty-Humility
@@ -263,8 +266,7 @@ def _build_ledger_interpretation(state: PersonalityState) -> str:
             high_dir, low_dir = _FACET_DIRECTIVES[field_name]
 
             if baseline == 0.0:
-                # For zero-baseline models, only flag when value is notable
-                if value >= 0.3 and high_dir:
+                if value >= _ZERO_BASELINE_THRESHOLD and high_dir:
                     directives.append(f"  {field_name}={value:.2f}: {high_dir}")
             elif deviation > _SALIENCE_THRESHOLD and high_dir:
                 directives.append(f"  HIGH {field_name} ({value:.2f}): {high_dir}")
