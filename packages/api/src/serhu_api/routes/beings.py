@@ -57,7 +57,7 @@ def _get_orch(being_id: str):
 
 # -- CRUD -------------------------------------------------------------------
 
-@router.post("", response_model=BeingResponse, status_code=201)
+@router.post("/", response_model=BeingResponse, status_code=201)
 def create_being(body: CreateBeingRequest):
     """Create a new Being (tabula rasa)."""
     orch = create_being_orchestrator(name=body.name, language=body.language)

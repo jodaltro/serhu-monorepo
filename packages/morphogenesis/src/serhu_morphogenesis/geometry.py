@@ -27,6 +27,7 @@ from serhu_morphogenesis.types import GeometryProfile
 
 
 def compute_geometry(state: PersonalityState) -> GeometryProfile:
+
     """Derive the Being's geometry profile from its personality state.
 
     Roundness, symmetry, spikiness, and organic noise are driven by

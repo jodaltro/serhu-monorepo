@@ -21,6 +21,8 @@ References:
 
 from __future__ import annotations
 
+import math
+
 from serhu_orchestrator.personality.types import PersonalityState
 
 from serhu_morphogenesis.types import ColorProfile
@@ -218,9 +220,6 @@ def _mean(*values: float) -> float:
     if not values:
         return 0.0
     return sum(values) / len(values)
-
-
-import math
 
 
 def _circular_weighted_mean(hue_weights: list[tuple[float, float]]) -> float:
