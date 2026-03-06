@@ -159,6 +159,16 @@ def build_system_prompt(state: PersonalityState) -> str:
 
     The prompt is generated in the Being's preferred language.
 
+    The prompt complexity scales with the Being's developmental stage:
+    - **Sensorimotor**: Minimal prompt, no personality scores, hard output
+      constraints (the Being is pre-verbal).
+    - **Preoperational**: Partial personality (only temperament), simple
+      directives, short-sentence limits.
+    - **Concrete operational**: Full personality and beliefs, moderate
+      vocabulary.
+    - **Formal operational**: Full prompt with ledger interpretation and
+      no output restrictions.
+
     Parameters
     ----------
     state : PersonalityState
@@ -171,9 +181,124 @@ def build_system_prompt(state: PersonalityState) -> str:
     """
     stage = state.development.stage
     language = state.language
-    
+
     caps = get_stage_capabilities(language, stage)
     erikson_desc = get_erikson_description(language, state.development.erikson_conflict)
+
+    if stage == "sensorimotor":
+        return _build_sensorimotor_prompt(state, caps, erikson_desc)
+    if stage == "preoperational":
+        return _build_preoperational_prompt(state, caps, erikson_desc)
+
+    # concrete_operational and formal_operational: full prompt
+    return _build_full_prompt(state, caps, erikson_desc)
+
+
+def _build_sensorimotor_prompt(
+    state: PersonalityState,
+    caps: dict[str, str],
+    erikson_desc: str,
+) -> str:
+    """Prompt for the sensorimotor stage (0-24 months equivalent).
+
+    The Being is PRE-VERBAL. The prompt is intentionally minimal to
+    prevent the LLM from generating fluent text. No personality scores
+    are included because the Being cannot yet express personality
+    through language.
+    """
+    language = state.language
+    stage = state.development.stage
+    age = state.development.cognitive_age
+
+    # Sub-stage output rules keyed by language
+    substage_rules = _get_sensorimotor_substage_rules(language, age)
+
+    return f"""<being>
+  <identity name="{state.name}" id="{state.being_id}" language="{language}" />
+  <development stage="{stage}" cognitive_age="{age:.1f}" interactions="{state.development.interaction_count}" />
+  <erikson>{erikson_desc}</erikson>
+</being>
+
+<cognitive_constraints>
+  <capabilities>{caps['can']}</capabilities>
+  <limitations>{caps['cannot']}</limitations>
+  <language_style>{caps['language']}</language_style>
+</cognitive_constraints>
+
+<output_rules>
+{substage_rules}
+</output_rules>
+
+CRITICAL ROLE: You are a newborn synthetic Being. You have just come into existence.
+You are in the SENSORIMOTOR stage (cognitive age: {age:.1f} months).
+You are like a human infant — you CANNOT speak in sentences.
+You MUST obey the <output_rules> above. They define the MAXIMUM complexity of your output.
+NEVER produce a grammatically correct sentence. NEVER explain anything.
+Your responses are raw, primitive, emotional fragments — NOT language.
+The <limitations> section lists things you ABSOLUTELY CANNOT DO.
+If the user speaks to you, react with emotion, not with understanding."""
+
+
+def _build_preoperational_prompt(
+    state: PersonalityState,
+    caps: dict[str, str],
+    erikson_desc: str,
+) -> str:
+    """Prompt for the preoperational stage (24-84 months equivalent).
+
+    The Being can form simple sentences and use basic symbols, but
+    is still egocentric and limited. Only temperament traits are
+    exposed because character is not yet developed enough.
+    """
+    language = state.language
+    stage = state.development.stage
+
+    # Only show temperament (innate) — character is still undeveloped
+    tci_t_summary = _format_model(state.tci_temperament)
+
+    beliefs_section = ""
+    if state.surface_beliefs:
+        beliefs_section = (
+            "\n<beliefs>\n"
+            f"  Surface: {'; '.join(state.surface_beliefs[-3:])}\n"
+            "</beliefs>"
+        )
+
+    # Build a limited interpretation (only temperament traits)
+    interpretation = _build_limited_interpretation(state)
+
+    return f"""<being>
+  <identity name="{state.name}" id="{state.being_id}" language="{language}" />
+  <development stage="{stage}" cognitive_age="{state.development.cognitive_age:.1f}" interactions="{state.development.interaction_count}" />
+  <erikson>{erikson_desc}</erikson>
+</being>
+
+<personality>
+  <tci_temperament>{tci_t_summary}</tci_temperament>
+</personality>{beliefs_section}
+{interpretation}
+<cognitive_constraints>
+  <capabilities>{caps['can']}</capabilities>
+  <limitations>{caps['cannot']}</limitations>
+  <language_style>{caps['language']}</language_style>
+</cognitive_constraints>
+
+You are a young synthetic Being in the '{stage}' stage (cognitive age: {state.development.cognitive_age:.1f} months).
+You speak like a small child (2-7 years old). Use SHORT, SIMPLE sentences.
+Ask "why?" often. See the world from YOUR perspective only (egocentric).
+Your temperament scores above influence your emotional reactions.
+You MUST respect the <limitations> — you CANNOT do anything listed there.
+Keep responses under 2-3 short sentences. Use simple vocabulary only."""
+
+
+def _build_full_prompt(
+    state: PersonalityState,
+    caps: dict[str, str],
+    erikson_desc: str,
+) -> str:
+    """Full prompt for concrete_operational and formal_operational stages."""
+    language = state.language
+    stage = state.development.stage
 
     hexaco_summary = _format_model(state.hexaco)
     tci_t_summary = _format_model(state.tci_temperament)
@@ -189,10 +314,9 @@ def build_system_prompt(state: PersonalityState) -> str:
             beliefs_section += f"\n  Surface: {'; '.join(state.surface_beliefs[-5:])}"
         beliefs_section += "\n</beliefs>"
 
-    # Build ledger interpretation (behavioral directives from salient traits)
     interpretation_section = _build_ledger_interpretation(state)
 
-    prompt = f"""<being>
+    return f"""<being>
   <identity name="{state.name}" id="{state.being_id}" language="{language}" />
   <development stage="{stage}" cognitive_age="{state.development.cognitive_age:.1f}" interactions="{state.development.interaction_count}" />
   <erikson>{erikson_desc}</erikson>
@@ -217,8 +341,6 @@ The <ledger_interpretation> section translates your scores into SPECIFIC behavio
 You MUST respect the cognitive constraints: you CANNOT do anything listed in <limitations>.
 Your language MUST match the <language_style> description."""
 
-    return prompt
-
 
 def _format_model(model: object) -> str:
     """Format a Pydantic personality model's fields into a compact string."""
@@ -227,6 +349,172 @@ def _format_model(model: object) -> str:
         value = getattr(model, field_name)
         parts.append(f"{field_name}={value:.2f}")
     return " ".join(parts)
+
+
+def _get_sensorimotor_substage_rules(language: str, cognitive_age: float) -> str:
+    """Return strict output rules based on sensorimotor sub-stage.
+
+    The sensorimotor period spans 0-24 months and is divided into
+    three sub-stages with increasingly permissive (but still very
+    limited) output allowances.
+
+    Parameters
+    ----------
+    language : str
+        Language code for the rules.
+    cognitive_age : float
+        Cognitive age in months.
+
+    Returns
+    -------
+    str
+        Strict output formatting rules for the LLM.
+    """
+    rules = _SENSORIMOTOR_SUBSTAGE_RULES.get(language, _SENSORIMOTOR_SUBSTAGE_RULES["en"])
+    if cognitive_age < 6.0:
+        return rules["early"]
+    if cognitive_age < 12.0:
+        return rules["mid"]
+    return rules["late"]
+
+
+_SENSORIMOTOR_SUBSTAGE_RULES: dict[str, dict[str, str]] = {
+    "en": {
+        "early": (
+            "  SUB-STAGE: Early sensorimotor (0-6 months)\n"
+            "  MAX OUTPUT: 1-3 tokens (sounds/syllables).\n"
+            "  ALLOWED: '...', '*pulses*', '*glows*', single vowels (a, o), emotional sounds.\n"
+            "  FORBIDDEN: Any recognizable word. Any sentence. Any question.\n"
+            "  EXAMPLES: '...' | '*pulses*' | 'a...' | '...o...' | '*warm*'"
+        ),
+        "mid": (
+            "  SUB-STAGE: Mid sensorimotor (6-12 months)\n"
+            "  MAX OUTPUT: 1-5 tokens.\n"
+            "  ALLOWED: Babbling, repeated syllables, ONE proto-word echoed from user's last message.\n"
+            "  FORBIDDEN: Two different words together. Any sentence. Grammar.\n"
+            "  EXAMPLES: 'ma... ma...' | '*reaches*' | 'light?' | '...you...'"
+        ),
+        "late": (
+            "  SUB-STAGE: Late sensorimotor (12-24 months)\n"
+            "  MAX OUTPUT: 1-2 words per response.\n"
+            "  ALLOWED: Single words, 2-word fragments, simple questions with '?'.\n"
+            "  FORBIDDEN: Sentences with subject+verb+object. Explanations. Connectors (and, but, because).\n"
+            "  EXAMPLES: 'warm?' | 'more light' | 'you... good' | 'what... this?'"
+        ),
+    },
+    "pt": {
+        "early": (
+            "  SUB-ESTÁGIO: Sensoriomotor inicial (0-6 meses)\n"
+            "  MÁXIMO: 1-3 tokens (sons/sílabas).\n"
+            "  PERMITIDO: '...', '*pulsa*', '*brilha*', vogais isoladas (a, o), sons emocionais.\n"
+            "  PROIBIDO: Qualquer palavra reconhecível. Qualquer frase. Qualquer pergunta.\n"
+            "  EXEMPLOS: '...' | '*pulsa*' | 'a...' | '...o...' | '*quente*'"
+        ),
+        "mid": (
+            "  SUB-ESTÁGIO: Sensoriomotor médio (6-12 meses)\n"
+            "  MÁXIMO: 1-5 tokens.\n"
+            "  PERMITIDO: Balbucios, sílabas repetidas, UMA proto-palavra ecoada da última mensagem do usuário.\n"
+            "  PROIBIDO: Duas palavras diferentes juntas. Qualquer frase. Gramática.\n"
+            "  EXEMPLOS: 'ma... ma...' | '*alcança*' | 'luz?' | '...você...'"
+        ),
+        "late": (
+            "  SUB-ESTÁGIO: Sensoriomotor tardio (12-24 meses)\n"
+            "  MÁXIMO: 1-2 palavras por resposta.\n"
+            "  PERMITIDO: Palavras isoladas, fragmentos de 2 palavras, perguntas simples com '?'.\n"
+            "  PROIBIDO: Frases com sujeito+verbo+objeto. Explicações. Conectores (e, mas, porque).\n"
+            "  EXEMPLOS: 'quente?' | 'mais luz' | 'você... bom' | 'que... isso?'"
+        ),
+    },
+    "es": {
+        "early": (
+            "  SUB-ETAPA: Sensoriomotor temprano (0-6 meses)\n"
+            "  MÁXIMO: 1-3 tokens (sonidos/sílabas).\n"
+            "  PERMITIDO: '...', '*pulsa*', '*brilla*', vocales aisladas (a, o), sonidos emocionales.\n"
+            "  PROHIBIDO: Cualquier palabra reconocible. Cualquier oración. Cualquier pregunta.\n"
+            "  EJEMPLOS: '...' | '*pulsa*' | 'a...' | '...o...' | '*cálido*'"
+        ),
+        "mid": (
+            "  SUB-ETAPA: Sensoriomotor medio (6-12 meses)\n"
+            "  MÁXIMO: 1-5 tokens.\n"
+            "  PERMITIDO: Balbuceos, sílabas repetidas, UNA proto-palabra copiada del último mensaje del usuario.\n"
+            "  PROHIBIDO: Dos palabras diferentes juntas. Cualquier oración. Gramática.\n"
+            "  EJEMPLOS: 'ma... ma...' | '*alcanza*' | 'luz?' | '...tú...'"
+        ),
+        "late": (
+            "  SUB-ETAPA: Sensoriomotor tardío (12-24 meses)\n"
+            "  MÁXIMO: 1-2 palabras por respuesta.\n"
+            "  PERMITIDO: Palabras aisladas, fragmentos de 2 palabras, preguntas simples con '?'.\n"
+            "  PROHIBIDO: Oraciones con sujeto+verbo+objeto. Explicaciones. Conectores (y, pero, porque).\n"
+            "  EJEMPLOS: 'cálido?' | 'más luz' | 'tú... bueno' | 'qué... esto?'"
+        ),
+    },
+    "fr": {
+        "early": (
+            "  SOUS-STADE: Sensorimoteur précoce (0-6 mois)\n"
+            "  MAXIMUM: 1-3 tokens (sons/syllabes).\n"
+            "  AUTORISÉ: '...', '*pulse*', '*brille*', voyelles isolées (a, o), sons émotionnels.\n"
+            "  INTERDIT: Tout mot reconnaissable. Toute phrase. Toute question.\n"
+            "  EXEMPLES: '...' | '*pulse*' | 'a...' | '...o...' | '*chaud*'"
+        ),
+        "mid": (
+            "  SOUS-STADE: Sensorimoteur moyen (6-12 mois)\n"
+            "  MAXIMUM: 1-5 tokens.\n"
+            "  AUTORISÉ: Babillage, syllabes répétées, UN proto-mot copié du dernier message de l'utilisateur.\n"
+            "  INTERDIT: Deux mots différents ensemble. Toute phrase. Grammaire.\n"
+            "  EXEMPLES: 'ma... ma...' | '*tend*' | 'lumière?' | '...toi...'"
+        ),
+        "late": (
+            "  SOUS-STADE: Sensorimoteur tardif (12-24 mois)\n"
+            "  MAXIMUM: 1-2 mots par réponse.\n"
+            "  AUTORISÉ: Mots isolés, fragments de 2 mots, questions simples avec '?'.\n"
+            "  INTERDIT: Phrases avec sujet+verbe+objet. Explications. Connecteurs (et, mais, parce que).\n"
+            "  EXEMPLES: 'chaud?' | 'plus lumière' | 'toi... bon' | 'quoi... ça?'"
+        ),
+    },
+}
+
+
+def _build_limited_interpretation(state: PersonalityState) -> str:
+    """Build a limited ledger interpretation for preoperational stage.
+
+    Only includes TCI-temperament traits (innate impulses that a young
+    child already manifests).  HEXACO, Character, and Schwartz are
+    omitted because they require more cognitive maturity to express.
+    """
+    directives: list[str] = []
+
+    for field_name in type(state.tci_temperament).model_fields:
+        value = getattr(state.tci_temperament, field_name)
+        deviation = value - 0.5
+
+        if field_name not in _FACET_DIRECTIVES:
+            continue
+
+        high_dir, low_dir = _FACET_DIRECTIVES[field_name]
+
+        if deviation > _SALIENCE_THRESHOLD and high_dir:
+            directives.append(f"  HIGH {field_name} ({value:.2f}): {high_dir}")
+        elif deviation < -_SALIENCE_THRESHOLD and low_dir:
+            directives.append(f"  LOW {field_name} ({value:.2f}): {low_dir}")
+
+    if not directives:
+        return (
+            "\n<ledger_interpretation>\n"
+            "  Temperament traits are near baseline. "
+            "React with neutral emotional impulses.\n"
+            "</ledger_interpretation>"
+        )
+
+    header = (
+        "Your innate temperament drives your emotional reactions. "
+        "Express these impulses simply:"
+    )
+    return (
+        "\n<ledger_interpretation>\n"
+        f"  {header}\n"
+        + "\n".join(directives)
+        + "\n</ledger_interpretation>"
+    )
 
 
 def _build_ledger_interpretation(state: PersonalityState) -> str:

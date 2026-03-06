@@ -164,7 +164,7 @@ class TestOpenAIClientChat:
                 system_prompt="sys prompt",
                 messages=[{"role": "user", "content": "msg"}],
                 temperature=0.5,
-                max_completion_tokens=512,
+                max_tokens=512,
             )
 
             call_args = mock_instance.chat.completions.create.call_args
