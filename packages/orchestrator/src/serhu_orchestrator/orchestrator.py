@@ -45,6 +45,8 @@ from serhu_orchestrator.personality.types import PersonalityState
 from serhu_orchestrator.sleep.dream_engine import DreamEngine
 from serhu_orchestrator.sleep.sleep_cycle import SleepCycle, SleepResult
 from serhu_orchestrator.sleep.neural_engine import NeuralEngine
+from serhu_orchestrator.sleep.online_planner import OnlinePlanner, PlanResult
+from serhu_orchestrator.sleep.aixi_environment import EnvironmentSpec, WorldModel
 
 logger = logging.getLogger(__name__)
 
@@ -138,6 +140,11 @@ class Orchestrator:
         self._sleep_result: SleepResult | None = None
         self._sleep_lock = threading.Lock()
 
+        # -- online planner (uses last consolidated WorldModel) --------------
+        self._last_environment_spec: EnvironmentSpec | None = None
+        self._last_world_model: WorldModel | None = None
+        self._online_planner = OnlinePlanner(neural_engine=self._neural)
+
     # -- properties ----------------------------------------------------------
 
     @property
@@ -155,6 +162,16 @@ class Orchestrator:
             self._sleep_thread is not None
             and self._sleep_thread.is_alive()
         )
+
+    @property
+    def online_planner(self) -> OnlinePlanner:
+        """The online planner used during chat (read-only access)."""
+        return self._online_planner
+
+    @property
+    def has_world_model(self) -> bool:
+        """Whether a consolidated WorldModel is available for online planning."""
+        return self._last_environment_spec is not None
 
     # -- wakefulness phase ---------------------------------------------------
 
@@ -217,6 +234,9 @@ class Orchestrator:
 
         The Being generates its response using patterns learned during
         sleep cycles (NeuralEngine) combined with its personality state.
+        When a consolidated WorldModel is available (after at least one
+        sleep cycle), the online planner runs short AIXI rollouts to
+        evaluate candidate responses and pick the best one (Phase -1).
         Early-stage Beings produce minimal, fragmented responses; as the
         Being matures through sleep cycles, responses become richer.
 
@@ -249,14 +269,33 @@ class Orchestrator:
         max_tokens, temperature = stage_llm_params(stage, age)
         logger.info(f"  → Stage={stage}, age={age:.1f}m, max_tokens={max_tokens}, temp={temperature}")
 
-        # 3. Generate Being's response from learned patterns + personality
+        # 3. Build state for planning
         recent_context = [entry.content for entry in context.working]
         personality_vector = SleepCycle._flatten_traits(self._personality)
 
-        logger.info(f"  → Generating response (neural engine)...")
-        being_response = self._neural.generate_response(
-            recent_context, personality_vector, max_tokens=max_tokens
-        )
+        # Phase -1: Online planning (if WorldModel available from sleep)
+        plan_result: PlanResult | None = None
+        if self._last_environment_spec is not None:
+            logger.info("  → Phase -1: Online planning with consolidated WorldModel")
+            plan_result = self._online_planner.plan_and_act(
+                context=recent_context,
+                personality_vector=personality_vector,
+                environment_spec=self._last_environment_spec,
+                world_model=self._last_world_model,
+                max_tokens=max_tokens,
+            )
+            being_response = plan_result.chosen_response
+            logger.info(
+                "  → Planner chose response (reward=%.4f, candidates=%d)",
+                plan_result.expected_reward,
+                plan_result.candidates_evaluated,
+            )
+        else:
+            # Fallback: direct NeuralEngine generation (no WorldModel yet)
+            logger.info("  → Generating response (neural engine, no WorldModel)...")
+            being_response = self._neural.generate_response(
+                recent_context, personality_vector, max_tokens=max_tokens
+            )
 
         # 4. Store Being's response in memory
         context = self._memory_manager.add_interaction("being", being_response)
@@ -274,7 +313,19 @@ class Orchestrator:
                 )
                 logger.info(f"  → Traits updated: {list(trait_deltas.keys())}")
 
-        logger.info(f"✓ chat complete: response='{being_response[:30]}...'")
+        # 6. Record real experience + reward post-turn
+        real_reward = OnlinePlanner.compute_real_reward(
+            user_message, being_response, personality_vector,
+            spec=self._last_environment_spec,
+        )
+        self._online_planner.record_experience(
+            action=being_response,
+            observation=user_message,
+            reward=real_reward,
+            planned_reward=plan_result.expected_reward if plan_result else 0.0,
+        )
+
+        logger.info(f"✓ chat complete: response='{being_response[:30]}...' (real_reward={real_reward:.4f})")
         return being_response, context
 
     def _extract_trait_deltas_from_interaction(
@@ -440,6 +491,12 @@ class Orchestrator:
                     self._personality = new_state
                     self._sleep_result = result
 
+                    # Persist consolidated WorldModel for online planning
+                    if result.environment_spec is not None:
+                        self._last_environment_spec = result.environment_spec
+                    if result.world_model is not None:
+                        self._last_world_model = result.world_model
+
                     # Store extracted facts and persist inside the lock
                     for fact in result.facts_extracted:
                         self._memory_manager.store_semantic_fact(fact)
@@ -558,6 +615,12 @@ class Orchestrator:
             num_rollouts=num_rollouts,
             svd_rank=svd_rank,
         )
+
+        # Persist consolidated WorldModel for online planning
+        if result.environment_spec is not None:
+            self._last_environment_spec = result.environment_spec
+        if result.world_model is not None:
+            self._last_world_model = result.world_model
 
         # Store extracted facts in relational memory
         for fact in result.facts_extracted:

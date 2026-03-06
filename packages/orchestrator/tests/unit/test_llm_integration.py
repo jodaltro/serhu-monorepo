@@ -535,6 +535,115 @@ class TestOrchestratorChat:
             assert result.training_result is not None
             assert result.training_result.vocabulary_size > 0
 
+    def test_chat_without_world_model_skips_planner(self):
+        """Before any sleep, chat should skip online planning (no WorldModel)."""
+        from serhu_orchestrator.orchestrator import Orchestrator
+        from tests.e2e.conftest import InMemoryArchival, InMemoryRelational
+
+        with (
+            patch("serhu_orchestrator.orchestrator.ArchivalMemory", InMemoryArchival),
+            patch("serhu_orchestrator.orchestrator.RelationalMemory", InMemoryRelational),
+        ):
+            orch = Orchestrator(
+                qdrant_url="mock://q",
+                qdrant_api_key="k",
+                supabase_url="mock://s",
+                supabase_key="k",
+                being_name="NoPlanBeing",
+            )
+
+            assert not orch.has_world_model
+            response, ctx = orch.chat("Hello")
+            assert isinstance(response, str)
+            assert len(response) > 0
+
+    def test_chat_uses_online_planner_after_sleep(self):
+        """After sleep, chat should use the online planner (Phase -1)."""
+        from serhu_orchestrator.orchestrator import Orchestrator
+        from tests.e2e.conftest import InMemoryArchival, InMemoryRelational
+
+        with (
+            patch("serhu_orchestrator.orchestrator.ArchivalMemory", InMemoryArchival),
+            patch("serhu_orchestrator.orchestrator.RelationalMemory", InMemoryRelational),
+        ):
+            orch = Orchestrator(
+                qdrant_url="mock://q",
+                qdrant_api_key="k",
+                supabase_url="mock://s",
+                supabase_key="k",
+                being_name="PlanBeing",
+            )
+
+            # Add episodes and sleep
+            for i in range(5):
+                orch.process_message("user", f"Stars are cosmic and beautiful {i}")
+
+            result = orch.sleep_once(num_rollouts=50, svd_rank=4, seed=42)
+
+            # After sleep, WorldModel should be available
+            assert orch.has_world_model
+
+            # Chat should now use the planner
+            response, ctx = orch.chat("Tell me about stars")
+            assert isinstance(response, str)
+            assert len(response) > 0
+
+    def test_chat_records_experience_after_turn(self):
+        """After each chat turn, a real experience should be recorded."""
+        from serhu_orchestrator.orchestrator import Orchestrator
+        from tests.e2e.conftest import InMemoryArchival, InMemoryRelational
+
+        with (
+            patch("serhu_orchestrator.orchestrator.ArchivalMemory", InMemoryArchival),
+            patch("serhu_orchestrator.orchestrator.RelationalMemory", InMemoryRelational),
+        ):
+            orch = Orchestrator(
+                qdrant_url="mock://q",
+                qdrant_api_key="k",
+                supabase_url="mock://s",
+                supabase_key="k",
+                being_name="ExpBeing",
+            )
+
+            assert len(orch.online_planner.experiences) == 0
+
+            orch.chat("Hello world")
+            assert len(orch.online_planner.experiences) == 1
+
+            orch.chat("Tell me more")
+            assert len(orch.online_planner.experiences) == 2
+
+            # Check experience structure
+            exp = orch.online_planner.experiences[0]
+            assert exp.action != ""
+            assert isinstance(exp.reward, float)
+
+    def test_sleep_once_stores_world_model(self):
+        """sleep_once should persist the WorldModel for online planning."""
+        from serhu_orchestrator.orchestrator import Orchestrator
+        from tests.e2e.conftest import InMemoryArchival, InMemoryRelational
+
+        with (
+            patch("serhu_orchestrator.orchestrator.ArchivalMemory", InMemoryArchival),
+            patch("serhu_orchestrator.orchestrator.RelationalMemory", InMemoryRelational),
+        ):
+            orch = Orchestrator(
+                qdrant_url="mock://q",
+                qdrant_api_key="k",
+                supabase_url="mock://s",
+                supabase_key="k",
+                being_name="WMBeing",
+            )
+
+            assert not orch.has_world_model
+
+            for i in range(5):
+                orch.process_message("user", f"test episode {i}")
+
+            orch.sleep_once(num_rollouts=50, svd_rank=4, seed=42)
+
+            assert orch.has_world_model
+
 
 # ---------------------------------------------------------------------------
 # DreamEngine with LLM
