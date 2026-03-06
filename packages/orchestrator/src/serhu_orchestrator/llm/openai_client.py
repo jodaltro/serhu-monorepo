@@ -48,7 +48,7 @@ class OpenAIClient:
         messages: list[dict[str, str]],
         *,
         temperature: float = 0.7,
-        max_tokens: int = 1024,
+        max_completion_tokens: int = 1024,
     ) -> LLMResponse:
         """Generate a conversational response via GPT-5.4.
 
@@ -66,7 +66,7 @@ class OpenAIClient:
             model=self._model,
             messages=api_messages,
             temperature=temperature,
-            max_tokens=max_tokens,
+            max_completion_tokens=max_completion_tokens,
         )
 
         choice = response.choices[0]
@@ -117,7 +117,7 @@ class OpenAIClient:
             model=self._model,
             messages=[{"role": "user", "content": analysis_prompt}],
             temperature=0.2,
-            max_tokens=512,
+            max_completion_tokens=512,
         )
 
         raw = response.choices[0].message.content or "{}"
@@ -160,7 +160,7 @@ class OpenAIClient:
             model=self._model,
             messages=[{"role": "user", "content": extraction_prompt}],
             temperature=0.3,
-            max_tokens=512,
+            max_completion_tokens=512,
         )
 
         raw = response.choices[0].message.content or "[]"
@@ -199,7 +199,7 @@ class OpenAIClient:
             model=self._model,
             messages=[{"role": "user", "content": derivation_prompt}],
             temperature=0.4,
-            max_tokens=256,
+            max_completion_tokens=256,
         )
 
         raw = response.choices[0].message.content or "[]"

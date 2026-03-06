@@ -88,6 +88,8 @@ generated in the Being's language via `i18n.py`.
 | Module | Path | Description |
 |--------|------|-------------|
 | **orchestrator** | `orchestrator.py` | The Brain — top-level lifecycle controller |
+| **llm_client** | `llm/llm_client.py` | LLM protocol interface |
+| **openai_client** | `llm/openai_client.py` | GPT-5.4 implementation (chat, trait analysis, sleep enhancement) |
 | **working_memory** | `memory/working_memory.py` | In-process FIFO buffer (RAM) |
 | **archival_memory** | `memory/archival_memory.py` | Qdrant vector store (Disk) |
 | **relational_memory** | `memory/relational_memory.py` | Supabase structured store (DB) |
@@ -121,6 +123,15 @@ Required variables:
 - `QDRANT_API_KEY` — Qdrant API key
 - `SUPABASE_URL` — Supabase project URL
 - `SUPABASE_KEY` — Supabase anon/service key
+
+**LLM Integration (Optional)**
+
+To enable GPT-5.4-powered chat and sleep enhancement:
+
+- `OPENAI_API_KEY` — Your OpenAI API key
+- `OPENAI_MODEL` — Model name (default: `gpt-5.4`)
+
+See [LLM_SETUP.md](./LLM_SETUP.md) for detailed configuration and usage.
 
 ### Supabase Table Setup
 

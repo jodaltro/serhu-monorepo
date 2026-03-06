@@ -162,13 +162,13 @@ class TestOpenAIClientChat:
                 system_prompt="sys prompt",
                 messages=[{"role": "user", "content": "msg"}],
                 temperature=0.5,
-                max_tokens=512,
+                max_completion_tokens=512,
             )
 
             call_args = mock_instance.chat.completions.create.call_args
             assert call_args.kwargs["model"] == "gpt-5.4"
             assert call_args.kwargs["temperature"] == 0.5
-            assert call_args.kwargs["max_tokens"] == 512
+            assert call_args.kwargs["max_completion_tokens"] == 512
             msgs = call_args.kwargs["messages"]
             assert msgs[0]["role"] == "system"
             assert msgs[0]["content"] == "sys prompt"
