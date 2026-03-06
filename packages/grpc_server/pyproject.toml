@@ -1,0 +1,22 @@
+[project]
+name = "serhu-grpc"
+version = "0.1.0"
+description = "SerHu gRPC Server - BeingService implementation for Lambda/Fargate communication"
+requires-python = ">=3.11"
+dependencies = [
+    "serhu-orchestrator",
+    "grpcio>=1.70.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.5",
+    "grpcio-tools>=1.70.0",
+]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -125,8 +125,11 @@ generated in the Being's language via `i18n.py`.
 ## Setup
 
 ```bash
-cd packages/orchestrator
-pip install -e ".[dev]"
+# Install all packages in development mode
+pip install -e "packages/orchestrator[dev]"
+pip install -e "packages/morphogenesis[dev]"
+pip install -e "packages/api[dev]"
+pip install -e "packages/grpc_server[dev]"
 ```
 
 ### Environment Variables
@@ -209,23 +212,99 @@ python -m pytest packages/orchestrator/tests/unit -v
 # Local end-to-end tests (no external services needed, uses in-memory mocks)
 python -m pytest packages/orchestrator/tests/e2e -v
 
+# Morphogenesis tests
+python -m pytest packages/morphogenesis/tests/unit -v
+
+# API tests (uses in-memory mocks)
+python -m pytest packages/api/tests/unit -v
+
+# gRPC server tests (direct + in-process channel)
+python -m pytest packages/grpc_server/tests/unit -v
+
 # Integration tests (requires Qdrant + Supabase credentials in .env)
 python -m pytest packages/orchestrator/tests/integration -v -m integration
 
-# All tests
-python -m pytest packages/orchestrator/tests/ -v
+# ALL tests (328 tests, no external services)
+python -m pytest packages/orchestrator/tests/unit packages/orchestrator/tests/e2e \
+  packages/morphogenesis/tests/unit packages/api/tests/unit \
+  packages/grpc_server/tests/unit -v
 ```
 
 ### Test Categories
 
-| Category | Directory | External Services | Coverage |
-|----------|-----------|-------------------|----------|
-| **Unit** | `tests/unit/` | None | Individual modules in isolation |
-| **E2E Local** | `tests/e2e/` | None (in-memory mocks) | Full lifecycle: create → interact → evolve → sleep → prompt |
-| **Integration** | `tests/integration/` | Qdrant + Supabase | Real backend connectivity |
+| Category | Directory | External Services | Tests | Coverage |
+|----------|-----------|-------------------|-------|----------|
+| **Orchestrator Unit** | `packages/orchestrator/tests/unit/` | None | 240 | Individual modules in isolation |
+| **Orchestrator E2E** | `packages/orchestrator/tests/e2e/` | None (in-memory mocks) | 30 | Full lifecycle: create → interact → evolve → sleep → prompt |
+| **Morphogenesis Unit** | `packages/morphogenesis/tests/unit/` | None | 26 | Color, geometry, animation engines |
+| **API Unit** | `packages/api/tests/unit/` | None (in-memory mocks) | 16 | REST endpoints, CRUD, visual state |
+| **gRPC Unit** | `packages/grpc_server/tests/unit/` | None | 16 | Servicer + in-process channel |
+| **Integration** | `packages/orchestrator/tests/integration/` | Qdrant + Supabase | — | Real backend connectivity |
 
 ## Packages
 
 | Package | Description |
 |---------|-------------|
 | `packages/orchestrator` | The Brain — MemGPT-like memory OS + personality engine |
+| `packages/api` | FastAPI REST API — exposes the Orchestrator to mobile/web clients |
+| `packages/morphogenesis` | Visual Morphogenesis Engine — personality → color/shape/animation |
+| `packages/grpc_server` | gRPC BeingService — Lambda ↔ Fargate binary communication |
+
+## Application Modules
+
+### API Server (`packages/api`)
+
+REST API built with FastAPI, exposing the Orchestrator's full lifecycle:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Health check |
+| `/beings` | POST | Create a new Being (tabula rasa) |
+| `/beings/{id}` | GET | Get Being summary |
+| `/beings/{id}/personality` | GET | Full personality ledger (72-dim vector) |
+| `/beings/{id}/chat` | POST | Chat with LLM (requires OPENAI_API_KEY) |
+| `/beings/{id}/process` | POST | Process message without LLM (manual mode) |
+| `/beings/{id}/consolidate` | POST | Consolidate working memory to archival |
+| `/beings/{id}/sleep` | POST | Trigger full sleep cycle (NREM + REM) |
+| `/beings/{id}/recall` | POST | Recall memories via semantic search |
+| `/beings/{id}/learn` | POST | Store a semantic fact |
+| `/beings/{id}/visual` | GET | Get visual morphogenesis state for renderer |
+
+```bash
+# Run the API server
+cd packages/api && pip install -e ".[dev]"
+uvicorn serhu_api.app:app --host 0.0.0.0 --port 8000
+```
+
+### Morphogenesis Engine (`packages/morphogenesis`)
+
+Translates the 72-dimension personality vector into visual parameters
+for 3D rendering (Three.js, Unity, Unreal, etc.):
+
+| Component | Driven By | Output |
+|-----------|-----------|--------|
+| **Color** (HSL) | HEXACO + TCI dimensions | Hue (personality), Saturation (arousal), Lightness (valence) |
+| **Geometry** | Agreeableness, Openness, Conscientiousness | Roundness, spikiness, symmetry, complexity, scale |
+| **Animation** | TCI Temperament (NS, HA, RD, PS) | Pulse rate, movement speed, center attraction, glow, roughness |
+
+Follows the Kiki/Bouba principle:
+- Agreeable/cooperative → rounded, soft, spherical (Bouba)
+- Assertive/novelty-seeking → angular, spiky, sharp (Kiki)
+
+### gRPC Server (`packages/grpc_server`)
+
+Implements the `BeingService` defined in `proto/ser_identity.proto`
+for high-performance binary communication between services:
+
+| RPC | Description |
+|-----|-------------|
+| `GetLedger` | Retrieve current personality ledger |
+| `RecordEvent` | Record a new event in the life log |
+| `ReplayEvents` | Reconstruct ledger at a point in time |
+| `StreamEvents` | Server-side streaming for real-time sync |
+
+```bash
+# Run the gRPC server
+cd packages/grpc_server && pip install -e ".[dev]"
+python -m serhu_grpc.server --port 50051
+```

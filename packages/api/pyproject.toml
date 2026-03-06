@@ -1,0 +1,25 @@
+[project]
+name = "serhu-api"
+version = "0.1.0"
+description = "SerHu REST API - FastAPI server exposing the Orchestrator"
+requires-python = ">=3.11"
+dependencies = [
+    "serhu-orchestrator",
+    "serhu-morphogenesis",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
+    "pydantic-settings>=2.8.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.5",
+    "httpx>=0.28.0",
+]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
