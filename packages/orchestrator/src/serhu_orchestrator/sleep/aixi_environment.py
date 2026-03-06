@@ -176,6 +176,11 @@ class AixiEnvironment:
     _CURIOSITY_INDEX = 24
     _CONSCIENTIOUSNESS_INDEX = 16
 
+    _EXPLORATION_KEYWORDS = frozenset({
+        "explore", "novel", "new", "discover", "ask", "curious",
+    })
+    _INTRINSIC_REWARD_MAGNITUDE = 0.3
+
     def __init__(
         self,
         spec: EnvironmentSpec,
@@ -273,9 +278,8 @@ class AixiEnvironment:
 
         # --- Intrinsic: curiosity / novelty bonus (fixed) -----------------
         r_int = 0.0
-        explore_keywords = {"explore", "novel", "new", "discover", "ask", "curious"}
-        if any(kw in combined for kw in explore_keywords):
-            r_int = 0.3
+        if any(kw in combined for kw in self._EXPLORATION_KEYWORDS):
+            r_int = self._INTRINSIC_REWARD_MAGNITUDE
 
         # --- Alpha: personality-derived weight for intrinsic reward --------
         openness = (

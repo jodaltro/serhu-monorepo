@@ -524,7 +524,7 @@ class TestEnvironmentBuilderFromNeuralEngine:
         assert "user_curious" in spec.observations
         assert "silence" in spec.observations
 
-    def test_rewards_are_personality_independent(self):
+    def test_reward_signals_are_personality_independent(self):
         episodes = [{"content": "Hello world"}]
         neural = NeuralEngine(seed=42)
 
