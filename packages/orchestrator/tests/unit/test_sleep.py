@@ -4,6 +4,7 @@ import pytest
 
 from serhu_orchestrator.sleep.dream_engine import DreamEngine, Hypothesis
 from serhu_orchestrator.sleep.sleep_cycle import SleepCycle, SleepResult
+from serhu_orchestrator.sleep.value_model import ValueModel
 from serhu_orchestrator.personality.types import PersonalityState
 
 
@@ -348,3 +349,81 @@ class TestSleepCycleContinuous:
         assert len(result_holder) == 1
         _, result = result_holder[0]
         assert result.cycles_completed >= 1
+
+
+# ---------------------------------------------------------------------------
+# ValueModel integration tests
+# ---------------------------------------------------------------------------
+
+
+class TestSleepCycleValueModel:
+    """Tests for ValueModel training during sleep cycle."""
+
+    def _make_state(self) -> PersonalityState:
+        return PersonalityState(being_id="vm-test-001", name="VMTester")
+
+    def test_run_produces_value_model(self):
+        """Single-shot run should produce a trained ValueModel."""
+        state = self._make_state()
+        episodes = [
+            {"content": "I love music and music is great"},
+            {"content": "Music makes me happy"},
+        ]
+        cycle = SleepCycle(dream_engine=DreamEngine(seed=42))
+        _, result = cycle.run(state, episodes, num_rollouts=50, svd_rank=4)
+
+        assert result.value_model is not None
+        assert isinstance(result.value_model, ValueModel)
+        assert result.value_model.is_trained
+        assert result.value_model.version != ""
+
+    def test_value_model_has_metrics(self):
+        """The trained ValueModel should have quality metrics."""
+        state = self._make_state()
+        episodes = [{"content": "Stars are beautiful"}]
+        cycle = SleepCycle(dream_engine=DreamEngine(seed=42))
+        _, result = cycle.run(state, episodes, num_rollouts=50, svd_rank=4)
+
+        if result.value_model is not None:
+            assert "mse" in result.value_model.metrics
+            assert "samples" in result.value_model.metrics
+            assert "r_squared" in result.value_model.metrics
+
+    def test_value_model_can_predict(self):
+        """After sleep, the ValueModel should be able to predict rewards."""
+        state = self._make_state()
+        episodes = [
+            {"content": "I love music and music is great"},
+            {"content": "Music makes me happy"},
+        ]
+        cycle = SleepCycle(dream_engine=DreamEngine(seed=42))
+        _, result = cycle.run(state, episodes, num_rollouts=50, svd_rank=4)
+
+        if result.value_model is not None:
+            pred = result.value_model.predict([0.5] * 72, "explore_topic")
+            assert isinstance(pred, float)
+
+    def test_continuous_produces_value_model(self):
+        """Continuous mode should produce a ValueModel."""
+        state = self._make_state()
+        episodes = [
+            {"content": "I love music and music is great"},
+            {"content": "Music makes me happy"},
+        ]
+        cycle = SleepCycle(dream_engine=DreamEngine(seed=42))
+
+        def stop_after_2(cycle_num, _state):
+            if cycle_num >= 2:
+                cycle.request_stop()
+
+        _, result = cycle.run_continuous(
+            state, episodes, num_rollouts=10, svd_rank=4, on_cycle=stop_after_2
+        )
+
+        assert result.value_model is not None
+        assert result.value_model.is_trained
+
+    def test_sleep_result_value_model_default_none(self):
+        """SleepResult should default value_model to None."""
+        result = SleepResult()
+        assert result.value_model is None

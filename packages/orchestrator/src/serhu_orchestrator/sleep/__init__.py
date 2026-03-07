@@ -9,6 +9,7 @@ from serhu_orchestrator.sleep.aixi_environment import (
 from serhu_orchestrator.sleep.dream_engine import DreamEngine
 from serhu_orchestrator.sleep.neural_engine import NeuralEngine
 from serhu_orchestrator.sleep.sleep_cycle import SleepCycle
+from serhu_orchestrator.sleep.value_model import ValueModel
 
 __all__ = [
     "AixiEnvironment",
@@ -17,5 +18,6 @@ __all__ = [
     "EnvironmentSpec",
     "NeuralEngine",
     "SleepCycle",
+    "ValueModel",
     "WorldModel",
 ]

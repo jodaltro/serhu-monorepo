@@ -92,7 +92,8 @@ subsequent rollouts run autonomously.
 | **Dream (REM)** | MC-AIXI rollouts against `AixiEnvironment` (reset/step interface) | Generate hypotheses via environment simulation with discounted rewards |
 | **Consolidation (NREM)** | SVD rank-reduction | Noise removal from personality vector |
 | **Ledger Update** | NeuralEngine belief derivation + belief stack + persist | Derive beliefs from dreams, store evolved traits |
-| **WorldModel Persist** | Store EnvironmentSpec + WorldModel in Orchestrator | Enable online planning during subsequent chat turns |
+| **ValueModel Train** | Linear reward predictor on (state, action) → reward pairs | Pre-screen candidates online, cut rollout cost |
+| **WorldModel Persist** | Store EnvironmentSpec + WorldModel + ValueModel in Orchestrator | Enable online planning during subsequent chat turns |
 
 ### Online Planning (Phase -1 — Real-Time Action Selection)
 
@@ -103,7 +104,8 @@ during `chat()` to evaluate candidate responses via short AIXI rollouts:
 |---|---|---|
 | **Generate** | NeuralEngine × K variants | Produce K diverse response candidates |
 | **Map** | Token overlap matching | Associate each candidate with closest AIXI action |
-| **Evaluate** | AixiEnvironment mini-rollouts | Score each candidate via Monte-Carlo simulation |
+| **Pre-screen** | ValueModel.rank() (if trained) | Fast reward prediction to select top-3 for rollouts |
+| **Evaluate** | AixiEnvironment mini-rollouts | Score top-3 candidates via Monte-Carlo simulation |
 | **Select** | argmax(expected_reward) | Choose the candidate with highest expected reward |
 | **Record** | Experience logging | Store real reward post-turn for calibration |
 
@@ -145,9 +147,10 @@ generated in the Being's language via `i18n.py`.
 | **event_store** | `personality/event_store.py` | Event Sourcing (append-only life log + replay) |
 | **proto_converter** | `personality/proto_converter.py` | Pydantic ↔ Protobuf bidirectional conversion |
 | **dream_engine** | `sleep/dream_engine.py` | AIXI rollouts against `AixiEnvironment` (reset/step) + SVD dream pruning |
-| **sleep_cycle** | `sleep/sleep_cycle.py` | Full sleep orchestration (environment build → training → semantize → REM → NREM → ledger) |
+| **sleep_cycle** | `sleep/sleep_cycle.py` | Full sleep orchestration (environment build → training → semantize → REM → NREM → value model → ledger) |
 | **aixi_environment** | `sleep/aixi_environment.py` | RL-like AIXI environment (EnvironmentSpec, WorldModel, AixiEnvironment, EnvironmentBuilder) |
-| **online_planner** | `sleep/online_planner.py` | Real-time AIXI mini-rollouts for action selection during chat (Phase -1) |
+| **online_planner** | `sleep/online_planner.py` | Real-time AIXI mini-rollouts for action selection during chat (Phase -1) with ValueModel pre-screening |
+| **value_model** | `sleep/value_model.py` | Lightweight linear reward predictor V(state, action) → reward for candidate pre-screening |
 
 ## Setup
 

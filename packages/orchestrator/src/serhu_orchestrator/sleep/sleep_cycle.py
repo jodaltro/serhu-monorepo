@@ -44,6 +44,7 @@ from serhu_orchestrator.personality.types import PersonalityState
 from serhu_orchestrator.sleep.aixi_environment import EnvironmentSpec, WorldModel
 from serhu_orchestrator.sleep.dream_engine import DreamEngine, Hypothesis
 from serhu_orchestrator.sleep.neural_engine import NeuralEngine, TrainingResult
+from serhu_orchestrator.sleep.value_model import ValueModel
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +77,10 @@ class SleepResult:
     world_model : WorldModel | None
         The trained transition model used for AIXI rollouts,
         versioned separately from the environment spec.
+    value_model : ValueModel | None
+        Lightweight reward predictor trained on (state, action) → reward
+        pairs collected from dream rollouts.  Used by the online planner
+        to pre-screen candidates and cut rollout cost.
     """
 
     facts_extracted: list[str] = field(default_factory=list)
@@ -87,6 +92,7 @@ class SleepResult:
     training_result: TrainingResult | None = None
     environment_spec: EnvironmentSpec | None = None
     world_model: WorldModel | None = None
+    value_model: ValueModel | None = None
 
 
 class SleepCycle:
@@ -204,6 +210,11 @@ class SleepCycle:
         )
         result.traits_after = consolidated
 
+        # Phase 4.5: Train ValueModel on (state, action) → reward pairs
+        result.value_model = self._train_value_model(
+            result.hypotheses, personality_vector
+        )
+
         # Phase 5: Ledger update – apply consolidated traits + beliefs
         logger.info(f"  Phase 5: Ledger update")
         state = self._apply_consolidated_traits(state, consolidated)
@@ -298,6 +309,11 @@ class SleepCycle:
                 personality_vector, target_rank=svd_rank
             )
             result.traits_after = consolidated
+
+            # Train ValueModel on dream hypotheses
+            result.value_model = self._train_value_model(
+                cycle_hypotheses, personality_vector
+            )
 
             # Ledger update
             state = self._apply_consolidated_traits(state, consolidated)
@@ -432,3 +448,35 @@ class SleepCycle:
             f"Interactions: {state.development.interaction_count}, "
             f"Language: {state.language}"
         )
+
+    @staticmethod
+    def _train_value_model(
+        hypotheses: list[Hypothesis],
+        personality_vector: list[float],
+    ) -> ValueModel | None:
+        """Train a ValueModel on (state, action) → reward pairs from dream hypotheses.
+
+        Returns ``None`` if there are no positive-reward hypotheses to learn from.
+        """
+        pairs: list[tuple[list[float], str]] = []
+        targets: list[float] = []
+        for h in hypotheses:
+            if h.action:
+                pairs.append((personality_vector, h.action))
+                targets.append(h.reward)
+
+        if not pairs:
+            return None
+
+        logger.info(
+            "  Phase 4.5: Training ValueModel on %d hypothesis pairs", len(pairs)
+        )
+        vm = ValueModel()
+        vm.fit(pairs, targets)
+        logger.info(
+            "    → ValueModel v%s: mse=%.6f, R²=%.4f",
+            vm.version,
+            vm.metrics.get("mse", 0.0),
+            vm.metrics.get("r_squared", 0.0),
+        )
+        return vm

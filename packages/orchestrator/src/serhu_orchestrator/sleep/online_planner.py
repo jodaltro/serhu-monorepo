@@ -33,6 +33,7 @@ from serhu_orchestrator.sleep.aixi_environment import (
     WorldModel,
 )
 from serhu_orchestrator.sleep.neural_engine import NeuralEngine
+from serhu_orchestrator.sleep.value_model import ValueModel
 
 logger = logging.getLogger(__name__)
 
@@ -142,8 +143,13 @@ class OnlinePlanner:
         world_model: WorldModel | None,
         *,
         max_tokens: int = 50,
+        value_model: ValueModel | None = None,
     ) -> PlanResult:
         """Run the online planning loop: generate candidates → evaluate → pick.
+
+        When a trained :class:`ValueModel` is provided, candidates are
+        pre-screened with fast reward prediction and only the top-3 are
+        evaluated with full AIXI rollouts, cutting planning cost.
 
         Parameters
         ----------
@@ -157,6 +163,8 @@ class OnlinePlanner:
             The trained transition model (from last sleep).
         max_tokens : int
             Maximum tokens for each candidate response.
+        value_model : ValueModel | None
+            Trained reward predictor for cheap pre-screening.
 
         Returns
         -------
@@ -185,19 +193,41 @@ class OnlinePlanner:
             for c in candidates
         ]
 
-        # Step 3: Evaluate each candidate with mini-rollouts
-        candidate_rewards: list[float] = []
-        for i, (candidate, action) in enumerate(
-            zip(candidates, candidate_actions)
-        ):
-            avg_reward = self._evaluate_candidate(
-                action, personality_vector, environment_spec, world_model
+        # Step 2.5: Pre-screen with ValueModel (if available)
+        rollout_indices: list[int]
+        if value_model is not None and value_model.is_trained and len(candidates) > 3:
+            ranked = value_model.rank(
+                personality_vector, candidate_actions, top_k=3
             )
-            candidate_rewards.append(avg_reward)
+            rollout_indices = [idx for idx, _act, _score in ranked]
+            logger.info(
+                "  → ValueModel pre-screening: %d → %d candidates for rollout",
+                len(candidates), len(rollout_indices),
+            )
+        else:
+            rollout_indices = list(range(len(candidates)))
+
+        # Step 3: Evaluate only selected candidates with mini-rollouts
+        rollout_set = set(rollout_indices)
+        candidate_rewards: list[float] = [-float("inf")] * len(candidates)
+        for i in rollout_indices:
+            avg_reward = self._evaluate_candidate(
+                candidate_actions[i], personality_vector,
+                environment_spec, world_model,
+            )
+            candidate_rewards[i] = avg_reward
             logger.info(
                 "  → Candidate %d: action=%s, avg_reward=%.4f",
-                i, action, avg_reward,
+                i, candidate_actions[i], avg_reward,
             )
+
+        # For candidates not evaluated via rollouts, use ValueModel prediction
+        if value_model is not None and value_model.is_trained:
+            for i in range(len(candidates)):
+                if i not in rollout_set:
+                    candidate_rewards[i] = value_model.predict(
+                        personality_vector, candidate_actions[i]
+                    )
 
         # Step 4: Pick the best candidate
         best_reward = max(candidate_rewards)
