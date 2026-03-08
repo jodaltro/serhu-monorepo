@@ -151,6 +151,7 @@ generated in the Being's language via `i18n.py`.
 | **aixi_environment** | `sleep/aixi_environment.py` | RL-like AIXI environment (EnvironmentSpec, WorldModel, AixiEnvironment, EnvironmentBuilder) |
 | **online_planner** | `sleep/online_planner.py` | Real-time AIXI mini-rollouts for action selection during chat (Phase -1) with ValueModel pre-screening |
 | **value_model** | `sleep/value_model.py` | Lightweight linear reward predictor V(state, action) → reward for candidate pre-screening |
+| **curriculum** | `curriculum/` | World Seed (Layer 1: facts), Synthetic Episodes (Layer 2: rubrics), Adaptive Curriculum (Layer 3: failure-targeted) |
 
 ## Setup
 
@@ -297,6 +298,7 @@ REST API built with FastAPI, exposing the Orchestrator's full lifecycle:
 | `/beings/{id}/sleep` | POST | Trigger full sleep cycle (NREM + REM) |
 | `/beings/{id}/recall` | POST | Recall memories via semantic search |
 | `/beings/{id}/learn` | POST | Store a semantic fact |
+| `/beings/{id}/seed` | POST | Seed world model with curated human knowledge (Layer 1 facts + Layer 2 episodes) |
 | `/beings/{id}/visual` | GET | Get visual morphogenesis state for renderer |
 
 ```bash

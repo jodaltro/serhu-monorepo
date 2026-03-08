@@ -321,3 +321,50 @@ class TestChatWithSelfLearning:
         data = resp.json()
         assert "response" in data
         assert isinstance(data["response"], str)
+
+
+class TestSeedWorld:
+
+    def test_seed_world_default_stage(self, client):
+        """Seed uses the Being's current stage when none is specified."""
+        create_resp = client.post("/beings", json={"name": "Luna"})
+        being_id = create_resp.json()["being_id"]
+
+        resp = client.post(f"/beings/{being_id}/seed")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["stage"] == "sensorimotor"
+        assert data["facts_injected"] > 0
+        assert data["episodes_injected"] > 0
+
+    def test_seed_world_specific_stage(self, client):
+        """Seed accepts an explicit stage parameter."""
+        create_resp = client.post("/beings", json={"name": "Luna"})
+        being_id = create_resp.json()["being_id"]
+
+        resp = client.post(
+            f"/beings/{being_id}/seed",
+            json={"stage": "preoperational"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["stage"] == "preoperational"
+        assert data["facts_injected"] > 0
+
+    def test_seed_world_without_episodes(self, client):
+        """Seed can inject facts only (no episodes)."""
+        create_resp = client.post("/beings", json={"name": "Luna"})
+        being_id = create_resp.json()["being_id"]
+
+        resp = client.post(
+            f"/beings/{being_id}/seed",
+            json={"include_episodes": False},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["facts_injected"] > 0
+        assert data["episodes_injected"] == 0
+
+    def test_seed_world_nonexistent_being_404(self, client):
+        resp = client.post("/beings/nonexistent-id/seed")
+        assert resp.status_code == 404
