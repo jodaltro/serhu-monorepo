@@ -220,3 +220,30 @@ class PersonalityResponse(BaseModel):
     schwartz: dict[str, float]
     core_beliefs: list[str]
     surface_beliefs: list[str]
+
+
+# -- World Seed -------------------------------------------------------------
+
+class SeedWorldRequest(BaseModel):
+    """Request body for seeding the Being's world model."""
+
+    stage: str | None = Field(
+        default=None,
+        description="Target Piaget stage. If null, uses the Being's current stage.",
+    )
+    include_episodes: bool = Field(
+        default=True,
+        description="Also inject synthetic episodes (Layer 2)",
+    )
+    episode_seed: int | None = Field(
+        default=None,
+        description="Random seed for episode generation reproducibility",
+    )
+
+
+class SeedWorldResponse(BaseModel):
+    """Response from world seeding."""
+
+    facts_injected: int
+    episodes_injected: int
+    stage: str
