@@ -94,6 +94,7 @@ class DreamEngine:
         neural_engine: NeuralEngine | None = None,
         *,
         llm_client: object | None = None,
+        is_first_sleep: bool = False,
     ) -> None:
         self._rng = random.Random(seed)
         self._seed = seed
@@ -102,6 +103,7 @@ class DreamEngine:
         self._training_result: TrainingResult | None = None
         self._environment_spec: EnvironmentSpec | None = None
         self._world_model: WorldModel | None = None
+        self._has_done_first_sleep = not is_first_sleep  # Pre-mark if is_first_sleep=True
 
     @property
     def neural_engine(self) -> NeuralEngine:
@@ -195,6 +197,7 @@ class DreamEngine:
         num_rollouts: int = 1000,
         top_k: int = 10,
         personality_summary: str = "",
+        cycle_offset: int = 0,
     ) -> list[Hypothesis]:
         """Simulate future interactions using MC-AIXI-CTW-inspired rollouts.
 
@@ -203,7 +206,7 @@ class DreamEngine:
         1. **Environment Build** (if not already built): Derives the
            environment spec from LLM or NeuralEngine patterns.
         2. **NeuralEngine Training**: Trains on episodic data for
-           action selection guidance.
+           action selection guidance (skipped if already trained).
         3. **AIXI Rollouts**: For each rollout, resets the environment
            and executes a sequence of ``step(action)`` calls, accumulating
            discounted reward.  Action selection uses NeuralEngine patterns
@@ -222,6 +225,10 @@ class DreamEngine:
             Number of best hypotheses to retain.
         personality_summary : str
             Compact personality summary for environment building.
+        cycle_offset : int
+            Cycle number offset for seed variation across continuous
+            sleep cycles.  Each cycle produces different rollouts by
+            shifting the per-rollout seed.
 
         Returns
         -------
@@ -235,26 +242,31 @@ class DreamEngine:
         spec = self._environment_spec
         assert spec is not None
 
-        # Step 2: Train NeuralEngine for action selection guidance
-        try:
-            self._training_result = self._neural.train(history, personality_vector)
-        except Exception:
-            logger.warning(
-                "Neural engine training failed, using random action selection",
-                exc_info=True,
-            )
+        # Step 2: Train NeuralEngine for action selection guidance (only if not already trained)
+        if not self._neural.is_trained:
+            try:
+                self._training_result = self._neural.train(history, personality_vector)
+            except Exception:
+                logger.warning(
+                    "Neural engine training failed, using random action selection",
+                    exc_info=True,
+                )
 
         # Step 3: Run AIXI rollouts against the environment
+        # Use cycle_offset to diversify seeds across continuous cycles
+        base_seed = (self._seed or 0) + cycle_offset * num_rollouts * 7
+        # Reseed the DreamEngine's RNG for action selection diversity
+        self._rng = random.Random(base_seed)
         hypotheses: list[Hypothesis] = []
         env = AixiEnvironment(
-            spec, personality_vector, seed=self._seed,
+            spec, personality_vector, seed=base_seed,
             world_model=self._world_model,
         )
 
         for i in range(num_rollouts):
             obs = env.reset()
-            # Vary the seed per rollout for diversity
-            env.reseed((self._seed or 0) + i)
+            # Vary the seed per rollout AND per cycle for diversity
+            env.reseed(base_seed + i)
 
             total_reward = 0.0
             action_trace: list[str] = []
@@ -280,9 +292,186 @@ class DreamEngine:
                 )
             )
 
-        # Return the top-k hypotheses (Ockham: prefer simple + high-reward)
-        hypotheses.sort(key=lambda h: h.reward, reverse=True)
-        return hypotheses[:top_k]
+        # Return top-k hypotheses using diversity-aware selection
+        # (balances reward with action-trace diversity so both generic
+        # and topic-specific hypotheses are represented)
+        top_hypotheses = self._select_diverse_topk(hypotheses, top_k)
+        # Sort final output by reward descending (consumers expect this)
+        top_hypotheses.sort(key=lambda h: h.reward, reverse=True)
+
+        # Step 4: Expand hypotheses with LLM for enrichment (ONLY on first sleep)
+        is_first_sleep = not self._has_done_first_sleep
+        if is_first_sleep and self._llm_client is not None:
+            try:
+                expanded = self._expand_hypotheses_with_llm(
+                    top_hypotheses, history, personality_summary,
+                    is_first_sleep=True
+                )
+                # Merge: keep both original and expanded for diversity
+                top_hypotheses = (top_hypotheses + expanded)[:top_k]
+                logger.info(
+                    f"  ⭐ FIRST SLEEP: LLM expanded hypotheses using ALL {len(history)} episodes from history"
+                )
+            except Exception:
+                logger.warning(
+                    "LLM expansion failed on first sleep, using base hypotheses",
+                    exc_info=True,
+                )
+            finally:
+                self._has_done_first_sleep = True
+        elif is_first_sleep:
+            logger.info(
+                f"  ℹ️  First sleep but no LLM client (would have used all {len(history)} episodes)"
+            )
+            self._has_done_first_sleep = True
+        else:
+            logger.debug(f"  (Subsequent sleep: no LLM expansion, using base hypotheses)")
+
+        return top_hypotheses
+
+    def _expand_hypotheses_with_llm(
+        self,
+        base_hypotheses: list[Hypothesis],
+        history: list[dict],
+        personality_summary: str,
+        *,
+        is_first_sleep: bool = False,
+    ) -> list[Hypothesis]:
+        """Use LLM to expand seed hypotheses with enriched versions.
+
+        Only activated on FIRST sleep cycle. Uses the ENTIRE episodic
+        history to enrich hypotheses with full psychological context.
+
+        This is where the Being's first dream becomes rich and coherent:
+        - LLM receives ALL interactions saved by MemoryManager
+        - LLM creates internal monologues connecting all past experiences
+        - Hypotheses become beliefs through this enrichment
+
+        Parameters
+        ----------
+        base_hypotheses : list[Hypothesis]
+            Seed hypotheses from AIXI rollouts.
+        history : list[dict]
+            COMPLETE episodic history (ALL saved interactions).
+        personality_summary : str
+            Compact personality description.
+        is_first_sleep : bool
+            Whether this is the first sleep cycle (enables expansion).
+
+        Returns
+        -------
+        list[Hypothesis]
+            Expanded hypotheses with enriched action text.
+        """
+        if not base_hypotheses or self._llm_client is None or not is_first_sleep:
+            return []
+
+        expanded: list[Hypothesis] = []
+        expand_fn = getattr(self._llm_client, "expand_dream_hypotheses", None)
+        if expand_fn is None:
+            return []
+
+        # Use ENTIRE history - all interactions saved by MemoryManager
+        # This is the Being's complete experience up to this first sleep
+        episode_block = "\n".join(
+            [f"[{ep.get('role', '?')}] {ep.get('content', '')}"
+             for ep in history]  # Use ALL episodes
+        )
+        
+        logger.info(
+            f"  📚 LLM Context: {len(history)} episodes from complete history "
+            f"({len(episode_block)} chars)"
+        )
+
+        try:
+            for i, h in enumerate(base_hypotheses[:5], start=1):  # Top-5 expansion
+                seed_trace = h.action
+                expanded_text = expand_fn(
+                    seed_trace=seed_trace,
+                    personality_summary=personality_summary,
+                    recent_context=episode_block,  # FULL history
+                )
+
+                if expanded_text and expanded_text != seed_trace:
+                    expanded.append(
+                        Hypothesis(
+                            action=expanded_text,
+                            reward=h.reward * 1.15,  # Boost for LLM-enriched
+                            complexity=h.complexity,
+                        )
+                    )
+                    logger.info(
+                        f"    [{i}/5] ✨ LLM enriched: seed={len(seed_trace)} chars → "
+                        f"expanded={len(expanded_text)} chars (reward ×1.15)"
+                    )
+
+        except Exception as e:
+            logger.warning(f"LLM expansion failed on first sleep: {e}", exc_info=False)
+
+        return expanded
+
+    def _select_diverse_topk(
+        self, hypotheses: list[Hypothesis], top_k: int
+    ) -> list[Hypothesis]:
+        """Select top-K hypotheses balancing reward quality with diversity.
+
+        Instead of simply taking the K highest-reward hypotheses (which
+        often converge to the same optimal path and produce identical
+        rewards → R²=0 for the ValueModel), this uses a greedy
+        diversification strategy:
+
+        1. Always pick the single best hypothesis by reward.
+        2. For each remaining slot, pick the hypothesis that maximises
+           a combined score of reward quality and Jaccard distance
+           (action-trace diversity) from already-selected hypotheses.
+
+        This ensures the top-K includes BOTH high-reward generic actions
+        AND topic-specific actions (e.g. ``discuss_natureza``) that carry
+        user-vocabulary tokens needed for belief extraction.
+        """
+        if len(hypotheses) <= top_k:
+            return sorted(hypotheses, key=lambda h: h.reward, reverse=True)
+
+        ranked = sorted(hypotheses, key=lambda h: h.reward, reverse=True)
+
+        # Always include the absolute best
+        selected: list[Hypothesis] = [ranked[0]]
+        remaining = list(ranked[1:])
+
+        # Pre-tokenize for Jaccard computation
+        def _trace_tokens(h: Hypothesis) -> frozenset[str]:
+            return frozenset(h.action.replace("→", " ").replace("_", " ").split())
+
+        sel_tokens = [_trace_tokens(selected[0])]
+        best_reward = abs(ranked[0].reward) or 1.0
+
+        while len(selected) < top_k and remaining:
+            best_idx = 0
+            best_score = -float("inf")
+
+            for i, h in enumerate(remaining):
+                h_tok = _trace_tokens(h)
+
+                # Min Jaccard distance to any already-selected hypothesis
+                min_diversity = 1.0
+                for st in sel_tokens:
+                    union = len(h_tok | st) or 1
+                    sim = len(h_tok & st) / union
+                    min_diversity = min(min_diversity, 1.0 - sim)
+
+                # Combined score: 40% normalised reward + 60% diversity
+                reward_norm = h.reward / best_reward if best_reward else 0.0
+                combined = 0.4 * reward_norm + 0.6 * min_diversity
+
+                if combined > best_score:
+                    best_score = combined
+                    best_idx = i
+
+            chosen = remaining.pop(best_idx)
+            selected.append(chosen)
+            sel_tokens.append(_trace_tokens(chosen))
+
+        return selected
 
     def _select_action(
         self,

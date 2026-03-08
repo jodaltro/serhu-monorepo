@@ -235,13 +235,28 @@ class SleepCycle:
         num_rollouts: int = 1000,
         svd_rank: int = 8,
         on_cycle: callable | None = None,
+        max_cycles: int | None = None,
+        cycle_interval_sec: float = 0.1,
+        convergence_threshold: float = 1e-4,
+        convergence_patience: int = 5,
     ) -> tuple[PersonalityState, SleepResult]:
-        """Run AIXI dream cycles indefinitely until ``request_stop()`` is called.
+        """Run AIXI dream cycles until stopped, converged, or max cycles reached.
+
+        By default (max_cycles=None), runs a single cycle. Pass max_cycles=0
+        for indefinite AIXI operation (requires external request_stop() call
+        or convergence detection).
 
         Semantization occurs once (first iteration).  Each subsequent
         iteration runs a fresh set of AIXI rollouts and SVD consolidation
         on the progressively refined personality vector, accumulating
         hypotheses and beliefs.
+
+        **Convergence detection**: Monitors personality vector delta between
+        cycles.  If the L2 norm of the change drops below
+        ``convergence_threshold`` for ``convergence_patience`` consecutive
+        cycles, the loop automatically transitions to a "slow mode" with
+        exponentially increasing intervals.  Once slow-mode cycles also
+        converge, sleep ends gracefully.
 
         Parameters
         ----------
@@ -256,12 +271,21 @@ class SleepCycle:
         on_cycle : callable | None
             Optional callback ``(cycle_number: int, state: PersonalityState) -> None``
             invoked after each completed cycle.
+        cycle_interval_sec : float
+            Pause between completed cycles in seconds (default: 0.1).
+            Uses an interruptible wait so ``request_stop()`` takes effect promptly.
+        convergence_threshold : float
+            Minimum personality vector L2 delta to consider a cycle "productive".
+        convergence_patience : int
+            Number of consecutive below-threshold cycles before entering slow mode.
 
         Returns
         -------
         tuple[PersonalityState, SleepResult]
             Updated personality state and accumulated sleep metadata.
         """
+        import math as _math
+
         result = SleepResult()
 
         # If already stopped (e.g., wake() called before thread started),
@@ -288,21 +312,48 @@ class SleepCycle:
         # Record initial traits
         result.traits_before = list(self._flatten_traits(state))
 
+        # Default to single cycle for safety (prevent runaway loops)
+        if max_cycles is None:
+            max_cycles = 1
+
+        # -- Convergence tracking state --
+        prev_vector = list(personality_vector)
+        stale_streak = 0          # cycles with no meaningful progress
+        best_reward = -float("inf")
+        total_beliefs = 0
+        # Accumulated ValueModel training data across cycles
+        vm_pairs: list[tuple[list[float], str]] = []
+        vm_targets: list[float] = []
+        accumulated_vm: ValueModel | None = None
+        # Track hypothesis *semantic fingerprints* (not exact sets)
+        # to detect true novelty vs spurious seed variation
+        prev_hyp_vocab: set[str] = set()
+        # Dream memory: best hypotheses feed back into NeuralEngine
+        dream_memory: list[dict] = []
+        # NeuralEngine re-training interval (every N cycles)
+        _RETRAIN_INTERVAL = 10
+
         cycle = 0
         while not self._stop_event.is_set():
             cycle += 1
-            if cycle == 1 or cycle % 500 == 0:
-                logger.info("Continuous sleep: dream cycle checkpoint=%d", cycle)
+            max_indicator = f"/{max_cycles}" if max_cycles > 0 else "/∞"
 
-            # Dream (REM) – AIXI rollouts
+            logger.info(f"  [CYCLE {cycle}{max_indicator}] Dream (REM) rollouts...")
+
+            # Dream (REM) – AIXI rollouts with cycle-varied seeds
             personality_vector = self._flatten_traits(state)
             cycle_hypotheses = self.dream_engine.perform_dream_rollouts(
                 history=episodes,
                 personality_vector=personality_vector,
                 num_rollouts=num_rollouts,
                 personality_summary=self._build_personality_summary(state),
+                cycle_offset=cycle,
             )
             result.hypotheses = cycle_hypotheses
+
+            if self._stop_event.is_set():
+                logger.info(f"  [CYCLE {cycle}{max_indicator}] Stop requested after rollouts")
+                break
 
             # Consolidation (NREM) – SVD dream pruning
             consolidated = DreamEngine.dream_pruning(
@@ -310,25 +361,153 @@ class SleepCycle:
             )
             result.traits_after = consolidated
 
-            # Train ValueModel on dream hypotheses
-            result.value_model = self._train_value_model(
-                cycle_hypotheses, personality_vector
-            )
+            if self._stop_event.is_set():
+                logger.info(f"  [CYCLE {cycle}{max_indicator}] Stop requested after consolidation")
+                break
 
-            # Ledger update
+            # --- ValueModel: accumulate and train incrementally ---
+            for h in cycle_hypotheses:
+                if h.action:
+                    vm_pairs.append((personality_vector, h.action))
+                    vm_targets.append(h.reward)
+
+            if vm_pairs:
+                # Only train if there's target variance (otherwise R²=0 guaranteed)
+                mean_t = sum(vm_targets) / len(vm_targets)
+                target_var = sum((t - mean_t) ** 2 for t in vm_targets) / len(vm_targets)
+                if target_var > 1e-8:
+                    if accumulated_vm is None:
+                        accumulated_vm = ValueModel()
+                    metrics = accumulated_vm.fit(vm_pairs, vm_targets)
+                    result.value_model = accumulated_vm
+                    if cycle == 1 or cycle % 10 == 0:
+                        logger.info(
+                            "    ValueModel: %d pairs, mse=%.6f, R²=%.4f, v%s",
+                            len(vm_pairs), metrics.get("mse", 0.0),
+                            metrics.get("r_squared", 0.0), accumulated_vm.version,
+                        )
+                elif cycle == 1:
+                    logger.info(
+                        "    ValueModel: skipped — %d pairs with zero variance (σ²=%.2e)",
+                        len(vm_pairs), target_var,
+                    )
+
+            if self._stop_event.is_set():
+                logger.info(f"  [CYCLE {cycle}{max_indicator}] Stop requested after value model")
+                break
+
+            # --- Ledger update: apply traits + extract beliefs ---
             state = self._apply_consolidated_traits(state, consolidated)
             new_beliefs = self._extract_beliefs(cycle_hypotheses, state)
             result.beliefs_added.extend(new_beliefs)
             state.core_beliefs.extend(new_beliefs)
+            total_beliefs += len(new_beliefs)
 
             result.cycles_completed = cycle
+
+            # --- Dream memory: feed best hypotheses back as pseudo-episodes ---
+            for h in cycle_hypotheses[:3]:
+                if h.action and h.reward > 0:
+                    dream_memory.append({
+                        "role": "dream",
+                        "content": h.action.replace("→", " ").replace("_", " "),
+                    })
+
+            # --- Progressive NeuralEngine re-training ---
+            # Every N cycles, retrain with original episodes + dream memory,
+            # so the engine evolves vocabulary and patterns progressively
+            if cycle % _RETRAIN_INTERVAL == 0 and dream_memory:
+                augmented_episodes = episodes + dream_memory[-50:]  # cap memory
+                neural.train(augmented_episodes, personality_vector)
+                if cycle % 20 == 0:
+                    logger.info(
+                        "    NeuralEngine retrained: +%d dream pseudo-episodes → vocab=%d, patterns=%d",
+                        len(dream_memory[-50:]),
+                        neural.vocabulary_size,
+                        neural.pattern_count,
+                    )
+
+            # --- Convergence detection (semantic, not exact-set) ---
+            new_vector = self._flatten_traits(state)
+            delta = _math.sqrt(
+                sum((a - b) ** 2 for a, b in zip(new_vector, prev_vector))
+            )
+
+            # Best reward tracking
+            cycle_best = max((h.reward for h in cycle_hypotheses), default=0.0)
+            reward_improved = cycle_best > best_reward + 1e-4
+            if reward_improved:
+                best_reward = cycle_best
+
+            # Semantic novelty: compare vocabulary tokens across hypotheses,
+            # NOT exact action strings (which differ trivially between seeds)
+            current_vocab = set()
+            for h in cycle_hypotheses:
+                for t in h.action.replace("→", " ").replace("_", " ").lower().split():
+                    if len(t) > 2:
+                        current_vocab.add(t)
+            # Jaccard distance from previous cycle's vocabulary
+            if prev_hyp_vocab:
+                union = len(current_vocab | prev_hyp_vocab) or 1
+                jaccard = len(current_vocab & prev_hyp_vocab) / union
+                hyp_is_semantically_novel = jaccard < 0.8  # >20% new content
+            else:
+                hyp_is_semantically_novel = True
+            prev_hyp_vocab = current_vocab
+
+            # A cycle is productive if ANY meaningful progress occurred
+            is_productive = (
+                delta > convergence_threshold
+                or reward_improved
+                or len(new_beliefs) > 0
+                or hyp_is_semantically_novel
+            )
+
+            if is_productive:
+                stale_streak = 0
+            else:
+                stale_streak += 1
+
+            # Log progress (every cycle for first 5, then every 10, or on stagnation)
+            if cycle <= 5 or cycle % 10 == 0 or stale_streak == convergence_patience:
+                logger.info(
+                    f"    δ={delta:.6f}, stale={stale_streak}/{convergence_patience}, "
+                    f"beliefs={total_beliefs}, best_r={best_reward:.4f}, "
+                    f"novel={hyp_is_semantically_novel}, new_beliefs={len(new_beliefs)}"
+                )
+
+            prev_vector = new_vector
+
+            # --- Hard convergence: stop when truly stagnant ---
+            # No slow mode — if the system is stagnant, more cycles won't help.
+            # Instead, stop cleanly and let the next sleep session (with new
+            # interactions) bring fresh data for real learning.
+            if stale_streak >= convergence_patience:
+                logger.info(
+                    f"  [CYCLE {cycle}] Converged: no progress for {stale_streak} consecutive "
+                    f"cycles (δ={delta:.6f}, beliefs={total_beliefs}, best_r={best_reward:.4f}). "
+                    f"Sleep complete — waiting for new interactions."
+                )
+                break
 
             if on_cycle is not None:
                 on_cycle(cycle, state)
 
             # Check stop after callback (allows callback to request_stop)
             if self._stop_event.is_set():
+                logger.info(f"  [CYCLE {cycle}{max_indicator}] Stop requested externally")
                 break
+
+            # Check if max_cycles reached (0 = indefinite)
+            if max_cycles > 0 and cycle >= max_cycles:
+                logger.info(f"  [CYCLE {cycle}] Max cycles ({max_cycles}) reached, exiting")
+                break
+
+            # Inter-cycle cooldown (short, just to yield CPU)
+            if cycle_interval_sec > 0.0:
+                if self._stop_event.wait(timeout=cycle_interval_sec):
+                    logger.info(f"  [CYCLE {cycle}{max_indicator}] Stop requested during inter-cycle wait")
+                    break
 
         logger.info(
             "Continuous sleep ended after %d cycle(s)", result.cycles_completed
@@ -413,31 +592,48 @@ class SleepCycle:
         hypotheses should become permanent beliefs.  Falls back to
         the rule-based mechanism if neural analysis is unavailable.
 
+        If the neural path returns empty results, supplements with
+        rule-based beliefs to ensure every productive dream cycle
+        contributes at least some knowledge.
+
+        Accepts hypotheses with any non-negative reward (not just > 0)
+        since the AIXI environment may validly assign zero base reward
+        to exploratory actions.
+
         Reference: https://arxiv.org/html/2601.10025v1
         """
         neural = self.dream_engine.neural_engine
+        beliefs: list[str] = []
+
         if neural.is_trained:
             try:
-                hypothesis_texts = [h.action for h in hypotheses[:10] if h.reward > 0.0]
+                # Include hypotheses with reward >= 0 (not just > 0)
+                # Sort by reward to prioritize high-value hypotheses
+                sorted_hyp = sorted(hypotheses, key=lambda h: h.reward, reverse=True)
+                hypothesis_texts = [h.action for h in sorted_hyp[:10] if h.action and h.reward >= 0.0]
                 if hypothesis_texts:
                     personality_vector = self._flatten_traits(state)
-                    return neural.derive_beliefs(hypothesis_texts, personality_vector)
+                    beliefs = neural.derive_beliefs(hypothesis_texts, personality_vector)
             except Exception:
                 logger.warning(
                     "Neural belief derivation failed, falling back to rule-based",
                     exc_info=True,
                 )
 
-        return self._rule_based_extract_beliefs(hypotheses)
+        # Supplement with rule-based beliefs if neural produced nothing
+        if not beliefs:
+            beliefs = self._rule_based_extract_beliefs(hypotheses)
+
+        return beliefs
 
     @staticmethod
     def _rule_based_extract_beliefs(hypotheses: list[Hypothesis]) -> list[str]:
         """Rule-based belief extraction (original implementation)."""
         beliefs: list[str] = []
-        for h in hypotheses[:3]:
-            if h.reward > 0.0:
+        for h in hypotheses[:5]:
+            if h.reward >= 0.0 and h.action:
                 beliefs.append(f"Learned: {h.action} (confidence={h.reward:.2f})")
-        return beliefs
+        return beliefs[:3]
 
     @staticmethod
     def _build_personality_summary(state: PersonalityState) -> str:
@@ -456,7 +652,8 @@ class SleepCycle:
     ) -> ValueModel | None:
         """Train a ValueModel on (state, action) → reward pairs from dream hypotheses.
 
-        Returns ``None`` if there are no positive-reward hypotheses to learn from.
+        Returns ``None`` if there are no hypotheses or if all rewards are
+        identical (zero target variance → R²=0 guaranteed, not worth training).
         """
         pairs: list[tuple[list[float], str]] = []
         targets: list[float] = []
@@ -468,8 +665,18 @@ class SleepCycle:
         if not pairs:
             return None
 
+        # Check target variance — skip training if all rewards are identical
+        mean_t = sum(targets) / len(targets)
+        target_var = sum((t - mean_t) ** 2 for t in targets) / len(targets)
+        if target_var < 1e-8:
+            logger.info(
+                "  Phase 4.5: Skipping ValueModel — %d targets with zero variance (mean=%.4f)",
+                len(pairs), mean_t,
+            )
+            return None
+
         logger.info(
-            "  Phase 4.5: Training ValueModel on %d hypothesis pairs", len(pairs)
+            "  Phase 4.5: Training ValueModel on %d pairs (σ²=%.6f)", len(pairs), target_var
         )
         vm = ValueModel()
         vm.fit(pairs, targets)

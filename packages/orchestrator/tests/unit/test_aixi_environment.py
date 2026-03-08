@@ -379,8 +379,10 @@ class TestAixiEnvironment:
         env_low.reset()
         _, _, _, info_low = env_low.step("explore_novel")
 
-        assert info_high["r_total"] == pytest.approx(0.3)
-        assert info_low["r_total"] == pytest.approx(0.0)
+        # r_total includes small Gaussian noise (σ=0.03) for diversity,
+        # so use wider tolerance (abs=0.15 ≈ 5σ)
+        assert info_high["r_total"] == pytest.approx(0.3, abs=0.15)
+        assert info_low["r_total"] == pytest.approx(0.0, abs=0.15)
 
     def test_no_intrinsic_reward_for_non_explore_actions(self):
         spec = EnvironmentSpec(
@@ -399,8 +401,8 @@ class TestAixiEnvironment:
 
         # No explore keywords → r_int = 0
         assert info["r_int"] == 0.0
-        # r_total = r_ext + alpha * 0 = r_ext
-        assert info["r_total"] == info["r_ext"]
+        # r_total ≈ r_ext + noise (alpha * 0 = 0, noise is small Gaussian σ=0.03)
+        assert info["r_total"] == pytest.approx(info["r_ext"], abs=0.15)
 
     def test_reset_resets_step_count(self):
         env = AixiEnvironment(

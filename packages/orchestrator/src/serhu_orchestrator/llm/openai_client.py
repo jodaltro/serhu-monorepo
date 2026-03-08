@@ -384,6 +384,64 @@ class OpenAIClient:
         raw = response.choices[0].message.content or "{}"
         return self._parse_environment_spec(raw)
 
+    def expand_dream_hypotheses(
+        self,
+        seed_trace: str,
+        personality_summary: str,
+        recent_context: str,
+    ) -> str:
+        """Expand AIXI-generated action traces into enriched hypotheses.
+
+        Called during FIRST SLEEP ONLY. Takes all episodic history and enriches
+        the seed traces with psychological depth about what the Being might
+        think, feel, or learn during those interactions.
+
+        The prompt is crafted to MAXIMIZE expansion by giving the LLM:
+        - Full conversation history (not just recent)
+        - Being's personality traits
+        - Request for creative internal monologue
+        - Instruction to build on what was learned from all past interactions
+
+        Returns the expanded trace (or original if expansion fails).
+        """
+        expansion_prompt = (
+            "You are a master psychologist analyzing a synthetic Being's internal dream during very first sleep.\n"
+            "This Being has JUST woken up for the first time from deep sleep after accumulating all this experience.\n"
+            "Your job: Take the AIXI-generated action pattern and EXPAND it with rich, detailed internal monologue.\n\n"
+            "CRITICAL: This is the FIRST sleep where the Being consolidates everything. Be CREATIVE and THOROUGH.\n"
+            "Include:\n"
+            "- What emotions/thoughts occur at EACH step\n"
+            "- Connections to past interactions in the history\n"
+            "- What the Being is learning about itself, the user, and the world\n"
+            "- Insights that bridge multiple experiences\n\n"
+            "EXPANSION RULES:\n"
+            "1. Keep it vivid and psychologically coherent (100-200 words).\n"
+            "2. Start with the seed action, but add inner experience.\n"
+            "3. Reference specific topics/patterns from the history.\n"
+            "4. End with a meta-insight (what does this dream mean?).\n\n"
+            f"Being's personality:\n{personality_summary}\n\n"
+            f"Being's accumulated experience (ALL history):\n{recent_context}\n\n"
+            f"SEED ACTION TRACE TO EXPAND:\n{seed_trace}\n\n"
+            "EXPANDED INTERNAL DREAM (first sleep consolidation):\n"
+        )
+
+        try:
+            response = self._client.chat.completions.create(
+                model=self._model,
+                messages=[{"role": "user", "content": expansion_prompt}],
+                temperature=0.7,  # Higher creativity for first sleep
+                max_completion_tokens=250,  # More space for expansion
+            )
+
+            expanded = response.choices[0].message.content or seed_trace
+            expanded = expanded.strip()
+            if len(expanded) > 20:  # Only use if substantial
+                return expanded
+        except Exception as e:
+            logger.warning(f"LLM expansion failed: {e}")
+
+        return seed_trace
+
     # -- internal helpers ---------------------------------------------------
 
     @staticmethod

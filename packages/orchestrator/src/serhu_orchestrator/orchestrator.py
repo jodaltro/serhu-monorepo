@@ -445,6 +445,7 @@ class Orchestrator:
         *,
         num_rollouts: int = 1000,
         svd_rank: int = 8,
+        cycle_interval_sec: float = 0.1,
         seed: int | None = None,
     ) -> None:
         """Start continuous AIXI dreaming in the background.
@@ -460,6 +461,9 @@ class Orchestrator:
             Number of AIXI dream rollouts per cycle.
         svd_rank : int
             Target rank for SVD dream pruning.
+        cycle_interval_sec : float
+            Interval between continuous sleep cycles in seconds.
+            Lower values increase CPU usage and cycle throughput.
         seed : int | None
             Random seed for reproducible dreams.
 
@@ -471,7 +475,12 @@ class Orchestrator:
         if self.is_sleeping:
             raise RuntimeError("Being is already sleeping. Call wake() first.")
 
-        logger.info(f"😴 sleep: starting continuous AIXI dreaming (num_rollouts={num_rollouts}, svd_rank={svd_rank})")
+        logger.info(
+            "😴 sleep: starting continuous AIXI dreaming (num_rollouts=%d, svd_rank=%d, cycle_interval_sec=%.3f)",
+            num_rollouts,
+            svd_rank,
+            cycle_interval_sec,
+        )
         # Retrieve recent episodes
         episodes = self._relational.get_episodes(self._personality.being_id, limit=100)
         logger.info(f"  → Retrieved {len(episodes)} episodes for dreaming")
@@ -490,6 +499,8 @@ class Orchestrator:
                     episodes,
                     num_rollouts=num_rollouts,
                     svd_rank=svd_rank,
+                    max_cycles=0,
+                    cycle_interval_sec=cycle_interval_sec,
                 )
                 with self._sleep_lock:
                     self._personality = new_state
@@ -590,8 +601,8 @@ class Orchestrator:
     ) -> SleepResult:
         """Execute a single sleep cycle (backward-compatible).
 
-        For callers that need synchronous, single-shot sleep without
-        the continuous AIXI loop.
+        On FIRST sleep: retrieves ALL episodic history for LLM expansion.
+        On subsequent sleeps: uses recent episodes only.
 
         Parameters
         ----------
@@ -608,12 +619,28 @@ class Orchestrator:
             Metadata about the sleep cycle.
         """
         logger.info(f"😴 sleep_once: single synchronous cycle (num_rollouts={num_rollouts}, svd_rank={svd_rank})")
-        # Retrieve recent episodes
-        episodes = self._relational.get_episodes(self._personality.being_id, limit=100)
-        logger.info(f"  → Retrieved {len(episodes)} episodes for dreaming")
+        
+        # FIRST SLEEP: retrieve ALL history for LLM expansion efficiency
+        # SUBSEQUENT: retrieve recent for efficiency
+        is_first_sleep = not hasattr(self, '_sleep_count') or not self._sleep_count
+        if is_first_sleep:
+            # ALL episodes for maximum context in first sleep
+            episodes = self._relational.get_episodes(self._personality.being_id, limit=None)
+            logger.info(f"  → ⚡ FIRST SLEEP: Retrieved ALL {len(episodes)} episodes for LLM expansion")
+            self._sleep_count = 1
+        else:
+            # Recent episodes for efficiency
+            episodes = self._relational.get_episodes(self._personality.being_id, limit=100)
+            logger.info(f"  → Retrieved {len(episodes)} recent episodes")
+            self._sleep_count += 1
 
         # Run the sleep cycle (NeuralEngine shared from orchestrator)
-        dream_engine = DreamEngine(seed=seed, neural_engine=self._neural, llm_client=self._llm_client)
+        dream_engine = DreamEngine(
+            seed=seed,
+            neural_engine=self._neural,
+            llm_client=self._llm_client,
+            is_first_sleep=is_first_sleep,  # Flag for LLM expansion
+        )
         cycle = SleepCycle(dream_engine=dream_engine)
         self._personality, result = cycle.run(
             self._personality,

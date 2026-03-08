@@ -254,7 +254,8 @@ class TestSleepCycleContinuous:
                 cycle.request_stop()
 
         new_state, result = cycle.run_continuous(
-            state, episodes, num_rollouts=10, svd_rank=4, on_cycle=stop_after_3
+            state, episodes, num_rollouts=10, svd_rank=4, on_cycle=stop_after_3,
+            max_cycles=0,  # 0 = indefinite, stopped by callback
         )
 
         assert result.cycles_completed == 3
@@ -273,7 +274,8 @@ class TestSleepCycleContinuous:
                 cycle.request_stop()
 
         new_state, result = cycle.run_continuous(
-            state, episodes, num_rollouts=10, svd_rank=4, on_cycle=stop_after_2
+            state, episodes, num_rollouts=10, svd_rank=4, on_cycle=stop_after_2,
+            max_cycles=0,  # 0 = indefinite, stopped by callback
         )
 
         assert result.cycles_completed == 2

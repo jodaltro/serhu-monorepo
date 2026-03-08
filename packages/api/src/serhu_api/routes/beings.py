@@ -162,12 +162,19 @@ def consolidate(being_id: str):
 @router.post("/{being_id}/sleep", response_model=SleepResponse)
 def sleep(being_id: str, body: SleepRequest):
     """Start continuous AIXI dreaming (runs until wake is called)."""
-    logger.info(f"📍 [POST /beings/{being_id}/sleep] Starting sleep cycle: num_rollouts={body.num_rollouts}, svd_rank={body.svd_rank}")
+    logger.info(
+        "📍 [POST /beings/%s/sleep] Starting sleep cycle: num_rollouts=%d, svd_rank=%d, cycle_interval_sec=%.3f",
+        being_id,
+        body.num_rollouts,
+        body.svd_rank,
+        body.cycle_interval_sec,
+    )
     orch = _get_orch(being_id)
     try:
         orch.sleep(
             num_rollouts=body.num_rollouts,
             svd_rank=body.svd_rank,
+            cycle_interval_sec=body.cycle_interval_sec,
             seed=body.seed,
         )
         logger.info(f"✓ Sleep cycle started (running in background)")

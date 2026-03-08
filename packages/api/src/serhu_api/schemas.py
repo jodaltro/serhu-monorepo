@@ -87,6 +87,12 @@ class SleepRequest(BaseModel):
 
     num_rollouts: int = Field(default=1000, ge=1)
     svd_rank: int = Field(default=8, ge=1)
+    cycle_interval_sec: float = Field(
+        default=0.1,
+        ge=0.0,
+        le=60.0,
+        description="Interval between continuous sleep cycles in seconds",
+    )
     seed: int | None = Field(default=None)
 
 

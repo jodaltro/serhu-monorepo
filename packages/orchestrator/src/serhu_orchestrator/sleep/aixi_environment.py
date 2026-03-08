@@ -259,22 +259,44 @@ class AixiEnvironment:
 
         Returns ``(r_ext, r_int, r_total)`` where:
 
-        * **r_ext** – objective task reward from ``spec.reward_signals``.
+        * **r_ext** – objective task reward from ``spec.reward_signals``,
+          using **longest-match-wins** to prevent substring reward stacking
+          (e.g. "respond" won't add extra reward when "respond_empathically"
+          already matched).
         * **r_int** – curiosity/novelty bonus for exploration keywords
           (fixed magnitude, personality-independent).
-        * **r_total** = ``r_ext + alpha * r_int`` where *alpha* is
-          derived from the Being's openness and curiosity traits.
+        * **r_total** = ``r_ext + alpha * r_int + noise`` where *alpha* is
+          derived from the Being's openness and curiosity traits and
+          *noise* is small stochastic perturbation for reward diversity.
 
         Personality influences **how much** intrinsic reward matters
         (via *alpha*) but never changes *what* is rewarded.
         """
         combined = f"{action} {observation}".lower()
 
-        # --- Extrinsic: objective task reward from reward signals ----------
-        r_ext = 0.0
+        # --- Extrinsic: longest-match-wins reward from reward signals ------
+        # Collect all matching patterns, then discard shorter patterns that
+        # are substrings of longer ones already matched.  This prevents
+        # "respond" (0.3) from stacking with "respond_empathically" (0.4)
+        # and "happy" (0.45) from stacking with "user_happy" (0.5).
+        matched: list[tuple[str, float]] = []
         for pattern, r in self.spec.reward_signals.items():
             if pattern.lower() in combined:
-                r_ext += r
+                matched.append((pattern.lower(), r))
+
+        if matched:
+            # Sort longest first so we can greedily filter substrings
+            matched.sort(key=lambda x: len(x[0]), reverse=True)
+            filtered: list[tuple[str, float]] = []
+            for p, r in matched:
+                # Skip if this pattern is a substring of any already-kept
+                # longer pattern (prevents reward stacking)
+                if any(p in longer_p and p != longer_p for longer_p, _ in filtered):
+                    continue
+                filtered.append((p, r))
+            r_ext = sum(r for _, r in filtered)
+        else:
+            r_ext = 0.0
 
         # --- Intrinsic: curiosity / novelty bonus (fixed) -----------------
         r_int = 0.0
@@ -294,7 +316,13 @@ class AixiEnvironment:
         )
         alpha = (openness + curiosity) / 2.0
 
-        r_total = r_ext + alpha * r_int
+        # --- Stochastic noise for reward diversity -------------------------
+        # Small Gaussian noise (σ=0.03) breaks ties between top-K
+        # hypotheses that otherwise converge to identical rewards,
+        # enabling the ValueModel to learn (R² > 0).
+        noise = self._rng.gauss(0, 0.03)
+
+        r_total = r_ext + alpha * r_int + noise
         return r_ext, r_int, r_total
 
     @property
@@ -512,31 +540,49 @@ class EnvironmentBuilder:
         Personality no longer modulates reward magnitudes here.
         Instead, personality influences the *intrinsic* reward weight
         (alpha) inside ``AixiEnvironment._compute_reward()``.
+
+        Ensures at least a minimal set of rewards are always defined.
         """
+        # Always include base rewards for fundamental interactions
         rewards: dict[str, float] = {
             # Base rewards for fundamental interactions
-            "respond_empathically": 0.3,
-            "ask_question": 0.3,
-            "explore": 0.25,
-            "reflect": 0.25,
-            "reinforce_pattern": 0.15,
+            "respond_empathically": 0.4,
+            "respond": 0.3,
+            "ask_question": 0.35,
+            "ask": 0.3,
+            "explore": 0.4,
+            "explore_topic": 0.35,
+            "reflect": 0.3,
+            "reflect_on_self": 0.4,
+            "reinforce_pattern": 0.25,
             # Observation-based rewards
-            "user_engaged": 0.3,
-            "user_happy": 0.4,
-            "user_curious": 0.25,
-            "user_teaching": 0.35,
-            "silence": -0.1,
+            "user_engaged": 0.4,
+            "engaged": 0.35,
+            "user_happy": 0.5,
+            "happy": 0.45,
+            "user_curious": 0.35,
+            "curious": 0.3,
+            "user_teaching": 0.45,
+            "teaching": 0.4,
+            "user_responding": 0.3,
+            "responding": 0.25,
+            "silence": -0.05,
         }
 
         # Pattern-derived rewards (topics the user cares about)
-        if neural.is_trained:
+        if neural.is_trained and neural._vocabulary:
             top_tokens = sorted(
                 neural._vocabulary.items(),
                 key=lambda x: x[1],
                 reverse=True,
-            )[:5]
+            )[:8]
             for token, weight in top_tokens:
-                rewards[token] = min(weight * 2.0, 0.5)
+                # Higher base tokens get higher rewards (0.2-0.5)
+                reward_val = min(0.2 + weight * 0.3, 0.5)
+                rewards[token] = reward_val
+                # Also add discuss + token pattern
+                discuss_key = f"discuss_{token}"
+                rewards[discuss_key] = reward_val * 0.9
 
         return rewards
 

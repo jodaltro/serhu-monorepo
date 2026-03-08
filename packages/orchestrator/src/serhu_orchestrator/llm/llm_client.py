@@ -229,3 +229,34 @@ class LLMClient(Protocol):
             Raw environment specification for ``EnvironmentBuilder._parse_llm_spec()``.
         """
         ...
+    def expand_dream_hypotheses(
+        self,
+        seed_trace: str,
+        personality_summary: str,
+        recent_context: str,
+    ) -> str:
+        """Expand AIXI-generated action traces into enriched hypotheses.
+
+        Takes a seed action trace (e.g., "respond_empathically → explore_topic")
+        and enriches it with deeper psychological insights about what the Being
+        might think, feel, or learn during that interaction sequence.
+
+        This call is made during the sleep cycle to add semantic richness
+        to the dream hypotheses before they are scored and used for belief
+        derivation.  Enables the Being to develop more nuanced internal models.
+
+        Parameters
+        ----------
+        seed_trace : str
+            The AIXI-generated action sequence to expand.
+        personality_summary : str
+            Summary of the Being's current personality state.
+        recent_context : str
+            Recent conversation content for grounding.
+
+        Returns
+        -------
+        str
+            Expanded, semantically enriched version of the seed trace.
+        """
+        ...

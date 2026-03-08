@@ -372,6 +372,17 @@ class NeuralEngine:
         Evaluates which hypotheses have the strongest support from
         the learned patterns and personality alignment.
 
+        Hypothesis texts from AIXI rollouts are action traces like
+        ``"explore_topic → discuss_natureza → reflect_on_self"``.
+        This method extracts the meaningful content tokens (e.g.
+        ``"natureza"``) and scores them against the Being's learned
+        vocabulary and pattern library.
+
+        If no hypotheses score above zero, the method falls back to
+        generating beliefs from the top TF-IDF patterns directly,
+        ensuring every sleep cycle with a trained engine produces
+        at least some beliefs.
+
         Parameters
         ----------
         hypotheses : list[str]
@@ -390,13 +401,23 @@ class NeuralEngine:
         beliefs: list[str] = []
 
         # Score each hypothesis by vocabulary overlap and personality alignment
-        scored: list[tuple[str, float]] = []
+        scored: list[tuple[str, float, list[str]]] = []
         for h in hypotheses[:10]:
-            h_tokens = set(self._tokenize_text(h))
-            # Vocabulary support: how many hypothesis tokens are in our vocabulary
-            vocab_support = sum(
-                self._vocabulary.get(t, 0.0) for t in h_tokens
-            )
+            # Extract ALL tokens from hypothesis (including action-trace parts)
+            # Action traces look like "explore_topic → discuss_natureza → reflect_on_self"
+            # We also split on underscores and arrows to get individual words
+            expanded_text = h.replace("→", " ").replace("_", " ").replace(":", " ")
+            h_tokens = set(self._tokenize_text(expanded_text))
+
+            # Identify which hypothesis tokens match user vocabulary
+            matching_vocab_tokens: list[str] = []
+            vocab_support = 0.0
+            for t in h_tokens:
+                weight = self._vocabulary.get(t, 0.0)
+                if weight > 0.0:
+                    vocab_support += weight
+                    matching_vocab_tokens.append(t)
+
             # Pattern support: overlap with known patterns
             pattern_support = 0.0
             for p in self._patterns:
@@ -404,18 +425,59 @@ class NeuralEngine:
                 if overlap > 0:
                     pattern_support += p.weight * overlap
 
-            total_score = vocab_support + pattern_support
-            scored.append((h, total_score))
+            # Action-type bonus: hypotheses containing explore/reflect/empathic
+            # actions indicate developmental patterns worth noting
+            action_bonus = 0.0
+            action_keywords = {"explore", "reflect", "empathic", "discuss", "ask", "question"}
+            action_matches = h_tokens & action_keywords
+            if action_matches:
+                action_bonus = len(action_matches) * 0.05
+
+            total_score = vocab_support + pattern_support + action_bonus
+            scored.append((h, total_score, matching_vocab_tokens))
 
         # Top scoring hypotheses become beliefs
         scored.sort(key=lambda x: x[1], reverse=True)
-        for h_text, score in scored[:3]:
+        for h_text, score, vocab_matches in scored[:5]:
             if score > 0.0:
-                beliefs.append(
-                    f"Learned: {h_text} (confidence={min(score, 1.0):.2f})"
-                )
+                # Create a more meaningful belief text when possible
+                if vocab_matches:
+                    # Build belief around the user-vocabulary tokens found
+                    belief_topic = ", ".join(sorted(set(vocab_matches))[:3])
+                    beliefs.append(
+                        f"Learned: interest in {belief_topic} (confidence={min(score, 1.0):.2f})"
+                    )
+                else:
+                    # Fallback: use the raw hypothesis
+                    beliefs.append(
+                        f"Learned: {h_text} (confidence={min(score, 1.0):.2f})"
+                    )
 
-        return beliefs
+        # --- Fallback: if no hypothesis scored, derive beliefs from top ---
+        # --- vocabulary patterns directly (the Being always learns       ---
+        # --- SOMETHING from its dreams if it has vocabulary)             ---
+        if not beliefs and self._vocabulary:
+            top_vocab = sorted(
+                self._vocabulary.items(), key=lambda x: x[1], reverse=True
+            )[:5]
+            for token, weight in top_vocab:
+                if weight > 0.05 and len(token) > 2:
+                    beliefs.append(
+                        f"Learned: '{token}' is important (confidence={min(weight, 1.0):.2f})"
+                    )
+                    if len(beliefs) >= 3:
+                        break
+
+        # Deduplicate beliefs (same topic can appear in multiple hypotheses)
+        seen: set[str] = set()
+        unique_beliefs: list[str] = []
+        for b in beliefs:
+            key = b.split("(")[0].strip()  # Compare without confidence score
+            if key not in seen:
+                seen.add(key)
+                unique_beliefs.append(b)
+
+        return unique_beliefs[:3]
 
     # -- Response Generation (replaces external LLM chat) -------------------
 
@@ -863,17 +925,21 @@ class NeuralEngine:
 
         for i, j, score in pairs[:count]:
             if i < len(episodes) and j < len(episodes):
-                content_i = episodes[i].get("content", "")[:30]
-                content_j = episodes[j].get("content", "")[:30]
+                content_i = episodes[i].get("content", "")[:40]
+                content_j = episodes[j].get("content", "")[:40]
                 tokens_i = self._tokenize_text(content_i)
                 tokens_j = self._tokenize_text(content_j)
-                combined = tokens_i[:3] + tokens_j[:3]
-                if combined:
-                    hypotheses.append(
-                        f"hypothesis_about:{' '.join(combined)}"
-                    )
+                
+                # Compose: take meaningful tokens from both
+                combined = tokens_i[:2] + tokens_j[:2]
+                if combined and len(" ".join(combined)) > 3:
+                    hypotheses.append(f"hypothesis_about:{' '.join(combined)}")
+                
+                # Alternative: pattern sequence
+                if len(hypotheses) < count and len(tokens_i) >= 1 and len(tokens_j) >= 1:
+                    hypotheses.append(f"pattern:then:{tokens_i[0]}:then:{tokens_j[0]}")
 
-        return hypotheses
+        return hypotheses[:count]
 
     def _explore_novel_patterns(
         self,
@@ -884,23 +950,39 @@ class NeuralEngine:
         """Generate hypotheses through personality-modulated exploration."""
         hypotheses: list[str] = []
         openness = personality_vector[_OPENNESS_INDEX] if len(personality_vector) > _OPENNESS_INDEX else 0.5
+        curiosity = personality_vector[_CURIOSITY_INDEX] if len(personality_vector) > _CURIOSITY_INDEX else 0.5
 
-        # Select random episodes weighted by attention entropy
-        for _ in range(count):
+        # Strategy 1: Variable depth exploration from random episodes
+        for attempt in range(count):
             if episodes:
                 idx = self._rng.randint(0, len(episodes) - 1)
                 content = episodes[idx].get("content", "")
                 tokens = self._tokenize_text(content)
                 if tokens:
-                    # Exploration: take random subset of tokens
-                    sample_size = max(1, int(len(tokens) * (0.3 + 0.4 * openness)))
+                    # Exploration: take random subset, size modulated by openness/curiosity
+                    explore_factor = 0.3 + 0.5 * ((openness + curiosity) / 2.0)
+                    sample_size = max(1, int(len(tokens) * explore_factor))
                     sample = self._rng.sample(
                         tokens, min(sample_size, len(tokens))
                     )
-                    hypotheses.append(f"hypothesis_about:{' '.join(sample)}")
-                else:
-                    hypotheses.append("reinforce_existing_pattern")
-            else:
-                hypotheses.append("reinforce_existing_pattern")
+                    if sample:
+                        hypotheses.append(f"hypothesis_about:{' '.join(sample)}")
 
-        return hypotheses
+        # Strategy 2: Pattern chains (if openness/curiosity is high)
+        if ((openness + curiosity) / 2.0) > 0.5 and len(hypotheses) < count and len(episodes) >= 2:
+            idx1 = self._rng.randint(0, len(episodes) - 1)
+            idx2 = self._rng.randint(0, len(episodes) - 1)
+            content1 = episodes[idx1].get("content", "")
+            content2 = episodes[idx2].get("content", "")
+            tokens1 = self._tokenize_text(content1)
+            tokens2 = self._tokenize_text(content2)
+            if tokens1 and tokens2:
+                hypotheses.append(f"chain_then:{tokens1[0]}:then:{tokens2[0]}")
+
+        # Strategy 3: Fallback with action intent
+        if len(hypotheses) < count:
+            hypotheses.append("respond_to_user")
+            hypotheses.append("explore_new_topic")
+            hypotheses.append("reflect_on_interaction")
+
+        return hypotheses[:count]

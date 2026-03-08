@@ -72,8 +72,10 @@ class InMemoryRelational:
         self._episodes.append(entry)
         return entry
 
-    def get_episodes(self, being_id: str, limit: int = 50) -> list[dict]:
+    def get_episodes(self, being_id: str, limit: int | None = 50) -> list[dict]:
         matching = [e for e in self._episodes if e["being_id"] == being_id]
+        if limit is None:
+            return matching
         return matching[-limit:]
 
     # -- semantic facts ------------------------------------------------------
