@@ -500,9 +500,9 @@ Servidor FastAPI que expõe o Orchestrator via REST para clientes mobile/web:
 | `schemas.py` | Schemas Pydantic para request/response |
 | `dependencies.py` | Injeção de dependência para Orchestrator |
 | `routes/health.py` | Health check |
-| `routes/beings.py` | CRUD, chat, process, consolidate, sleep, recall, learn, visual |
+| `routes/beings.py` | CRUD, chat, process, consolidate, sleep, recall, learn, seed, visual |
 
-**Endpoints:** POST `/beings`, GET `/beings/{id}`, GET `/beings/{id}/personality`, POST `/beings/{id}/chat`, POST `/beings/{id}/process`, POST `/beings/{id}/consolidate`, POST `/beings/{id}/sleep`, POST `/beings/{id}/recall`, POST `/beings/{id}/learn`, GET `/beings/{id}/visual`
+**Endpoints:** POST `/beings`, GET `/beings/{id}`, GET `/beings/{id}/personality`, POST `/beings/{id}/chat`, POST `/beings/{id}/process`, POST `/beings/{id}/consolidate`, POST `/beings/{id}/sleep`, POST `/beings/{id}/recall`, POST `/beings/{id}/learn`, POST `/beings/{id}/seed`, GET `/beings/{id}/visual`
 
 ### **Morfogênese Visual (`packages/morphogenesis/`)**
 
@@ -568,6 +568,37 @@ npm run dev      # Inicia Vite dev server na porta 3000
 npm run build    # Build de produção em dist/
 npm run test     # Testes unitários (vitest)
 ```
+
+### **Currículo (`packages/orchestrator/src/serhu_orchestrator/curriculum/`)**
+
+Sistema de currículo em 3 camadas para bootstrapping do modelo de mundo do Ser sem depender de interações reais:
+
+| Arquivo | Responsabilidade |
+| :---- | :---- |
+| `types.py` | Modelos Pydantic: WorldSeedFact, SyntheticEpisode, FailureAnalysis, CurriculumConfig, etc. |
+| `envelope.py` | Human World Envelope: 6 domínios (objetos, espaço/tempo, ações, social, tarefas, comunicação) com vocabulário por estágio |
+| `world_seed.py` | Camada 1: 181 fatos/regularidades curados por estágio Piaget (sensorimotor, pré-operacional, concreto, formal) |
+| `episodes.py` | Camada 2: 40 episódios sintéticos com rubricas, critérios de sucesso e esquemas de recompensa |
+| `adaptive.py` | Camada 3: Geração adaptativa de episódios direcionados a falhas específicas do Ser |
+
+**Fluxo de Uso:**
+```python
+# Injetar conhecimento inicial (Orchestrator.seed_world)
+orch.seed_world("sensorimotor")  # → 49 fatos + 10 episódios
+
+# Gerar episódios adaptativos baseados em falhas
+from serhu_orchestrator.curriculum import generate_adaptive_episodes, FailureAnalysis
+failures = [FailureAnalysis(failure_id="f1", stage="sensorimotor", broken_criteria=["word_count"], failure_description="...")]
+episodes = generate_adaptive_episodes(failures, batch_size=30)
+```
+
+**Human World Envelope (6 Domínios):**
+1. `everyday_objects` — Objetos do cotidiano (casa, comida, brinquedos)
+2. `space_time` — Espaço/tempo (perto/longe, antes/depois)
+3. `physical_actions` — Ações físicas (pegar, cair, abrir)
+4. `social_routines` — Rotinas sociais (cumprimentar, pedir, agradecer)
+5. `tasks_and_rules` — Tarefas e regras (ordem, contagem, classificação)
+6. `communication` — Comunicação (pergunta, resposta, correção)
 
 ### **Testes (369 Python + 9 JS)**
 

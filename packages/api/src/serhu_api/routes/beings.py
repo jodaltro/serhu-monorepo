@@ -26,6 +26,8 @@ from serhu_api.schemas import (
     RecallResponse,
     LearnFactRequest,
     LearnFactResponse,
+    SeedWorldRequest,
+    SeedWorldResponse,
     VisualStateResponse,
     PersonalityResponse,
 )
@@ -267,6 +269,32 @@ def learn_fact(being_id: str, body: LearnFactRequest):
     orch.learn_fact(body.fact)
     logger.info(f"✓ Fact learned")
     return LearnFactResponse(stored=True)
+
+
+# -- World Seed -------------------------------------------------------------
+
+@router.post("/{being_id}/seed", response_model=SeedWorldResponse)
+def seed_world(being_id: str, body: SeedWorldRequest = SeedWorldRequest()):
+    """Seed the Being's world model with curated human knowledge.
+
+    Injects World Seed facts (Layer 1) and optionally synthetic
+    episodes (Layer 2) into the Being's memory pipeline.
+    """
+    logger.info(
+        "📍 [POST /beings/%s/seed] Seeding world: stage=%s, include_episodes=%s",
+        being_id, body.stage, body.include_episodes,
+    )
+    orch = _get_orch(being_id)
+    result = orch.seed_world(
+        stage=body.stage,
+        include_episodes=body.include_episodes,
+        episode_seed=body.episode_seed,
+    )
+    logger.info(
+        "✓ World seeded: facts=%d, episodes=%d, stage=%s",
+        result["facts_injected"], result["episodes_injected"], result["stage"],
+    )
+    return SeedWorldResponse(**result)
 
 
 # -- Visual morphogenesis ---------------------------------------------------

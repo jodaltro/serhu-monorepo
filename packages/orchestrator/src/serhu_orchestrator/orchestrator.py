@@ -48,6 +48,9 @@ from serhu_orchestrator.sleep.neural_engine import NeuralEngine
 from serhu_orchestrator.sleep.online_planner import OnlinePlanner, PlanResult
 from serhu_orchestrator.sleep.aixi_environment import EnvironmentSpec, WorldModel
 from serhu_orchestrator.sleep.value_model import ValueModel
+from serhu_orchestrator.curriculum.world_seed import get_world_seed
+from serhu_orchestrator.curriculum.episodes import generate_synthetic_episodes
+from serhu_orchestrator.curriculum.types import WorldSeedFact, SyntheticEpisode
 
 logger = logging.getLogger(__name__)
 
@@ -437,6 +440,71 @@ class Orchestrator:
             The stored fact row.
         """
         return self._memory_manager.store_semantic_fact(fact)
+
+    # -- world seed phase ----------------------------------------------------
+
+    def seed_world(
+        self,
+        stage: str | None = None,
+        *,
+        include_episodes: bool = True,
+        episode_seed: int | None = None,
+    ) -> dict:
+        """Bootstrap the Being's world model with curated human-world knowledge.
+
+        Injects World Seed facts (Layer 1) and optionally synthetic
+        episodes (Layer 2) into the memory pipeline.  Facts are stored
+        as semantic facts; episodes are stored as episodic memories that
+        the NeuralEngine can learn from during sleep.
+
+        Parameters
+        ----------
+        stage : str | None
+            Target Piaget stage.  If ``None``, uses the Being's current
+            development stage.
+        include_episodes : bool
+            If ``True``, also inject synthetic episodes.
+        episode_seed : int | None
+            Random seed for episode generation reproducibility.
+
+        Returns
+        -------
+        dict
+            Summary with keys ``facts_injected``, ``episodes_injected``,
+            and ``stage``.
+        """
+        if stage is None:
+            stage = self._personality.development.stage
+
+        logger.info("🌱 seed_world: seeding stage '%s'", stage)
+
+        # Layer 1: inject World Seed facts as semantic facts
+        facts = get_world_seed(stage)
+        for f in facts:
+            self._memory_manager.store_semantic_fact(f.fact)
+        logger.info("  → %d semantic facts injected", len(facts))
+
+        # Layer 2: inject synthetic episodes as episodic memories
+        episodes_count = 0
+        if include_episodes:
+            episodes = generate_synthetic_episodes(stage, seed=episode_seed)
+            for ep in episodes:
+                # Store each user turn as an episodic interaction
+                for turn in ep.user_turns:
+                    self._memory_manager.add_interaction("user", turn)
+                # Store expected response as a being interaction
+                self._memory_manager.add_interaction("being", ep.expected_good_response)
+            episodes_count = len(episodes)
+            logger.info("  → %d synthetic episodes injected", episodes_count)
+
+        logger.info("✓ seed_world complete: stage=%s, facts=%d, episodes=%d",
+                     stage, len(facts), episodes_count)
+
+        return {
+            "facts_injected": len(facts),
+            "episodes_injected": episodes_count,
+            "stage": stage,
+        }
 
     # -- sleep phase ---------------------------------------------------------
 
